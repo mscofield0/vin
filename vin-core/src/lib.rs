@@ -18,6 +18,7 @@ pub trait Actor {
     type Context;
 
     // impl'd by derive macro
+    fn new(ctx: Self::Context) -> Self;
     fn send<M: Message>(&self, msg: M) where Self: Forwarder<M>;
     fn state(&self) -> State;
     fn close(&self);

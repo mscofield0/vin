@@ -1,9 +1,8 @@
-use itertools::Itertools;
 use proc_macro::TokenStream;
-use proc_macro2::{TokenStream as TokenStream2, Span};
+use proc_macro2::TokenStream as TokenStream2;
 use rassert_rs::rassert;
-use syn::{parse_macro_input, Ident, DeriveInput, parse::{Parse, Parser}, Error, LitInt, TypePath, Token, Data, Fields, parenthesized, ImplGenerics, TypeGenerics, WhereClause, Field, DataStruct};
-use quote::{quote, ToTokens};
+use syn::{parse_macro_input, Ident, DeriveInput, parse::Parse, Error, LitInt, TypePath, Token, Data, Fields, parenthesized, ImplGenerics, TypeGenerics, WhereClause};
+use quote::quote;
 
 struct HandlesAttribute {
     message_type: TypePath,
@@ -35,7 +34,7 @@ impl Parse for AttrArg {
                 let paren_content;
                 parenthesized!(paren_content in input);
                 let size = paren_content.parse::<Ident>()?;
-                rassert!(size != "size", Error::new(size.span(), "unknown attribute argument type; expected: 'size'"));
+                rassert!(size == "size", Error::new(size.span(), "unknown attribute argument type; expected: 'size'"));
                 paren_content.parse::<Token![=]>()?;
                 let size = paren_content.parse::<LitInt>()?.base10_parse::<usize>()?;
                 paren_content.parse::<Token![,]>()?;
@@ -61,6 +60,7 @@ impl Parse for HandlesAttribute {
         let message_type = input.parse::<TypePath>()?;
         
         let attr = if !input.is_empty() {
+            input.parse::<Token![,]>()?;
             Some(input.parse::<AttrArg>()?)
         } else {
             None
@@ -162,6 +162,10 @@ fn form_hidden_struct_name(name: &Ident) -> Ident {
 
 fn form_context_struct_name(name: &Ident) -> Ident {
     quote::format_ident!("VinContext{}", name)
+}
+
+fn form_tracing_report(msg: String) -> TokenStream2 {
+    quote! { ::vin_macros::tracing::debug!("{:?}", #msg) }
 }
 
 fn form_message_names(handles_attrs: &Vec<HandlesAttribute>) -> (Vec<TypePath>, Vec<Ident>, Vec<Ident>) {
@@ -273,10 +277,22 @@ fn form_actor_trait(
     let (msg_names, msg_short_names, msg_fut_names) = form_message_names(&handles_attrs);
     let context_name = form_context_struct_name(name);
 
+    let on_started = form_tracing_report(format!("{}::on_started", name.to_string()));
+    let on_closing = form_tracing_report(format!("{}::on_closing", name.to_string()));
+    let on_closed = form_tracing_report(format!("{}::on_closed", name.to_string()));
+    let handling = form_tracing_report(format!("{}::handle", name.to_string()));
+
     quote! {
         #[::vin_macros::async_trait::async_trait]
         impl #impl_generics ::vin_macros::vin_core::Actor for #name #ty_generics #where_clause {
             type Context = #context_name;
+
+            fn new(ctx: Self::Context) -> Self {
+                Self {
+                    vin_ctx: ::vin_macros::tokio::sync::RwLock::new(ctx),
+                    vin_hidden: Default::default(),
+                }
+            }
 
             fn send<M: ::vin_macros::vin_core::Message>(&self, msg: M)
                 where Self: ::vin_macros::vin_core::Forwarder<M> 
@@ -305,6 +321,7 @@ fn form_actor_trait(
                 let self = ret.clone();
 
                 ::vin_macros::tokio::spawn(async move {
+                    println!("State: {:?}", self.vin_hidden.state);
                     #(
                     let mut #msg_fut_names = ::vin_macros::futures::future::poll_fn(|_| {
                         if let Some(val) = self.vin_hidden.mailbox.#msg_short_names.pop() {
@@ -316,7 +333,10 @@ fn form_actor_trait(
 
                     )*
 
+                    #on_started;
+                    self.vin_hidden.state.store(::vin_macros::vin_core::State::Starting);
                     self.on_started().await;
+                    self.vin_hidden.state.store(::vin_macros::vin_core::State::Running);
                     loop {
                         match self.vin_hidden.state.load() {
                             ::vin_macros::vin_core::State::Running => {},
@@ -326,10 +346,16 @@ fn form_actor_trait(
 
                         use ::core::borrow::Borrow;
                         ::vin_macros::tokio::select! {#(
-                            #msg_short_names = &mut #msg_fut_names => <Self as ::vin_macros::vin_core::Handler<#msg_names>>::handle(self.borrow(), #msg_short_names).await
+                            #msg_short_names = &mut #msg_fut_names => {
+                                #handling;
+                                <Self as ::vin_macros::vin_core::Handler<#msg_names>>::handle(self.borrow(), #msg_short_names).await
+                            }
                         ),*};
                     }
+                    #on_closing;
                     self.on_closing().await;
+                    #on_closed;
+                    self.vin_hidden.state.store(::vin_macros::vin_core::State::Closed);
                     self.on_closed().await;
                 });
                 
@@ -354,7 +380,7 @@ fn form_forwarder_impls(
                 match mode {
                     BoundedMode::Overwrite => {
                         quote! {
-                            self.vin_hidden.mailbox.#short_name.push(msg);
+                            let _ = self.vin_hidden.mailbox.#short_name.push(msg);
                         }
                     },
                     BoundedMode::Report => {
