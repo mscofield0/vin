@@ -1,7 +1,7 @@
 # vin
 A decentralized, ergonomic actor crate.
 
-```
+```toml
 [dependencies]
 vin = "0.1"
 ```
@@ -19,7 +19,7 @@ A basic usage of `vin`.
 ```rust
 use std::time::Duration;
 use tracing::Level;
-use vin::prelude::*;
+use vin::*;
 
 #[derive(Debug, Clone)]
 pub enum Msg {
