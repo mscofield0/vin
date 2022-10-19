@@ -1,4 +1,4 @@
-use vin::prelude::*;
+use vin::*;
 
 #[derive(Debug, Clone)]
 pub enum Msg {

@@ -1,6 +1,6 @@
 [package]
 name = "vin"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -8,9 +8,6 @@ edition = "2021"
 [dependencies]
 vin-core = { path = "src/vin-core", version = "*" }
 vin-macros = { path = "src/vin-macros", version = "*" }
-tracing = "0.1"
-tokio = { version = "1.21", features = ["macros", "rt", "sync", "time"] }
-async-trait = "0.1"
 
 [dev-dependencies]
 tracing-subscriber = "0.3"
