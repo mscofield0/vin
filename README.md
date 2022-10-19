@@ -14,7 +14,7 @@ Vin completely relies on [`tokio`](https://github.com/tokio-rs/tokio) (for the a
 
 ## Example
 
-A basic usage of `vin`.
+Basic usage of `vin`.
 
 ```rust
 use std::time::Duration;
