@@ -1,4 +1,4 @@
-use vin_macros;
+use vin::prelude::*;
 
 #[derive(Debug, Clone)]
 pub enum Msg {
@@ -7,14 +7,14 @@ pub enum Msg {
     Baz,
 }
 
-#[vin_macros::actor]
-#[vin_macros::handles(Msg)]
+#[vin::actor]
+#[vin::handles(Msg, bounded(size = 1, report))]
 struct MyActor {
     pub number: u32,
 }
 
-#[async_trait::async_trait]
-impl vin_core::Handler<Msg> for MyActor {
+#[async_trait]
+impl vin::Handler<Msg> for MyActor {
     async fn handle(&self, msg: Msg) {
         println!("The message is: {:?}", msg);
     }
@@ -24,7 +24,6 @@ impl vin_core::Handler<Msg> for MyActor {
 mod tests {
     use std::time::Duration;
     use tracing::Level;
-    use vin_core::*;
     use super::*;
 
     #[tokio::test]
@@ -35,9 +34,14 @@ mod tests {
 
         let ctx = VinContextMyActor { number: 42 };
         let actor = MyActor::new(ctx).start().await;
-        actor.send(Msg::Bar);
-        tokio::time::sleep(Duration::from_millis(250)).await;
-        actor.close();
-        tokio::time::sleep(Duration::from_millis(250)).await;
+        tokio::join!(
+            actor.send(Msg::Bar),
+            actor.send(Msg::Baz),
+            actor.send(Msg::Foo),
+            actor.send(Msg::Bar),
+        );
+        tokio::time::sleep(Duration::from_millis(500)).await;
+        vin_core::shutdown();
+        vin_core::wait_for_shutdowns().await;
     }
 }

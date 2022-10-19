@@ -10,7 +10,7 @@ struct HandlesAttribute {
 }
 
 enum BoundedMode {
-    Overwrite,
+    Wait,
     Report,
     Silent,
 }
@@ -40,10 +40,10 @@ impl Parse for AttrArg {
                 paren_content.parse::<Token![,]>()?;
                 let mode = paren_content.parse::<Ident>()?;
                 let mode = match mode.to_string().as_str() {
-                    "overwrite" => BoundedMode::Overwrite,
+                    "wait" => BoundedMode::Wait,
                     "report" => BoundedMode::Report,
                     "silent" => BoundedMode::Silent,
-                    _ => return Err(Error::new(mode.span(), "unknown bounded mode; valid modes are: 'overwrite', 'report', 'silent'")),
+                    _ => return Err(Error::new(mode.span(), "unknown bounded mode; valid modes are: 'wait', 'report', 'silent'")),
                 };
 
                 AttrArg::Bounded(size, mode)
@@ -138,7 +138,7 @@ pub fn actor(_args: TokenStream, input: TokenStream) -> TokenStream {
     quote! {
         #(#attrs)*
         pub struct #name {
-            vin_ctx: ::vin_macros::tokio::sync::RwLock<#context_struct_name>,
+            vin_ctx: ::vin::vin_macros::tokio::sync::RwLock<#context_struct_name>,
             vin_hidden: #hidden_struct_name,
         }
 
@@ -164,11 +164,7 @@ fn form_context_struct_name(name: &Ident) -> Ident {
     quote::format_ident!("VinContext{}", name)
 }
 
-fn form_tracing_report(msg: String) -> TokenStream2 {
-    quote! { ::vin_macros::tracing::debug!("{:?}", #msg) }
-}
-
-fn form_message_names(handles_attrs: &Vec<HandlesAttribute>) -> (Vec<TypePath>, Vec<Ident>, Vec<Ident>) {
+fn form_message_names(handles_attrs: &Vec<HandlesAttribute>) -> (Vec<TypePath>, Vec<Ident>) {
     let msg_names = handles_attrs.iter()
         .map(|attr| attr.message_type.clone())
         .collect::<Vec<_>>();
@@ -180,11 +176,7 @@ fn form_message_names(handles_attrs: &Vec<HandlesAttribute>) -> (Vec<TypePath>, 
         })
         .collect::<Vec<_>>();
 
-    let msg_fut_names = msg_short_names.iter()
-        .map(|name| quote::format_ident!("{}_fut", name))
-        .collect::<Vec<_>>();
-
-    (msg_names, msg_short_names, msg_fut_names)
+    (msg_names, msg_short_names)
 }
 
 fn form_vin_context_struct(name: &Ident, fields: &Fields) -> TokenStream2 {
@@ -211,11 +203,7 @@ fn form_vin_hidden_struct(name: &Ident, handles_attrs: &Vec<HandlesAttribute>) -
             let type_path = &attr.message_type;
             let short_name = &type_path.path.segments.last().unwrap().ident.to_string().to_lowercase();
             let short_name = quote::format_ident!("{}", short_name);
-            if attr.bounded.is_some() {
-                quote! { #short_name: ::vin_macros::crossbeam::queue::ArrayQueue<#type_path> }
-            } else {
-                quote! { #short_name: ::vin_macros::crossbeam::queue::SegQueue<#type_path> }
-            }
+            quote! { #short_name: (::vin::vin_macros::async_channel::Sender<#type_path>, ::vin::vin_macros::async_channel::Receiver<#type_path>) }
         })
         .collect::<Vec<_>>();
     let mailbox_field_inits = handles_attrs.iter()
@@ -223,9 +211,9 @@ fn form_vin_hidden_struct(name: &Ident, handles_attrs: &Vec<HandlesAttribute>) -
             let short_name = &attr.message_type.path.segments.last().unwrap().ident.to_string().to_lowercase();
             let short_name = quote::format_ident!("{}", short_name);
             if let Some(Bounded { size, mode: _ }) = &attr.bounded {
-                quote! { #short_name: ::vin_macros::crossbeam::queue::ArrayQueue::new(#size) }
+                quote! { #short_name: ::vin::vin_macros::async_channel::bounded(#size) }
             } else {
-                quote! { #short_name: ::vin_macros::crossbeam::queue::SegQueue::new() }
+                quote! { #short_name: ::vin::vin_macros::async_channel::unbounded() }
             }
         })
         .collect::<Vec<_>>();
@@ -253,7 +241,8 @@ fn form_vin_hidden_struct(name: &Ident, handles_attrs: &Vec<HandlesAttribute>) -
 
         struct #hidden_struct_name {
             mailbox: #mailbox_struct_name,
-            state: ::vin_macros::crossbeam::atomic::AtomicCell<::vin_macros::vin_core::State>,
+            state: ::vin::vin_macros::crossbeam::atomic::AtomicCell<::vin::vin_macros::vin_core::State>,
+            close: ::vin::vin_macros::tokio::sync::Notify,
         }
 
         impl Default for #hidden_struct_name {
@@ -261,6 +250,7 @@ fn form_vin_hidden_struct(name: &Ident, handles_attrs: &Vec<HandlesAttribute>) -
                 Self {
                     mailbox: Default::default(),
                     state: Default::default(),
+                    close: Default::default(),
                 }
             }
         }
@@ -274,89 +264,86 @@ fn form_actor_trait(
     ty_generics: &TypeGenerics,
     where_clause: Option<&WhereClause>,
 ) -> TokenStream2 {
-    let (msg_names, msg_short_names, msg_fut_names) = form_message_names(&handles_attrs);
+    let (msg_names, msg_short_names) = form_message_names(&handles_attrs);
     let context_name = form_context_struct_name(name);
 
-    let on_started = form_tracing_report(format!("{}::on_started", name.to_string()));
-    let on_closing = form_tracing_report(format!("{}::on_closing", name.to_string()));
-    let on_closed = form_tracing_report(format!("{}::on_closed", name.to_string()));
-    let handling = form_tracing_report(format!("{}::handle", name.to_string()));
-
     quote! {
-        #[::vin_macros::async_trait::async_trait]
-        impl #impl_generics ::vin_macros::vin_core::Actor for #name #ty_generics #where_clause {
+        #[::vin::vin_macros::async_trait::async_trait]
+        impl #impl_generics ::vin::vin_macros::vin_core::Actor for #name #ty_generics #where_clause {
             type Context = #context_name;
 
             fn new(ctx: Self::Context) -> Self {
                 Self {
-                    vin_ctx: ::vin_macros::tokio::sync::RwLock::new(ctx),
+                    vin_ctx: ::vin::vin_macros::tokio::sync::RwLock::new(ctx),
                     vin_hidden: Default::default(),
                 }
             }
 
-            fn send<M: ::vin_macros::vin_core::Message>(&self, msg: M)
-                where Self: ::vin_macros::vin_core::Forwarder<M> 
+            async fn send<M: ::vin::vin_macros::vin_core::Message + Send>(&self, msg: M)
+                where Self: ::vin::vin_macros::vin_core::Forwarder<M> 
             {
-                <Self as ::vin_macros::vin_core::Forwarder<M>>::forward(self, msg);
+                <Self as ::vin::vin_macros::vin_core::Forwarder<M>>::forward(self, msg).await;
             }
 
-            fn state(&self) -> ::vin_macros::vin_core::State {
+            fn state(&self) -> ::vin::vin_macros::vin_core::State {
                 self.vin_hidden.state.load()
             }
 
-            async fn ctx(&self) -> ::vin_macros::tokio::sync::RwLockReadGuard<Self::Context> {
+            async fn ctx(&self) -> ::vin::vin_macros::tokio::sync::RwLockReadGuard<Self::Context> {
                 self.vin_ctx.read().await
             }
 
-            async fn ctx_mut(&self) -> ::vin_macros::tokio::sync::RwLockWriteGuard<Self::Context> {
+            async fn ctx_mut(&self) -> ::vin::vin_macros::tokio::sync::RwLockWriteGuard<Self::Context> {
                 self.vin_ctx.write().await
             }
 
             fn close(&self) {
-                self.vin_hidden.state.store(::vin_macros::vin_core::State::Closing);
+                self.vin_hidden.state.store(::vin::vin_macros::vin_core::State::Closing);
+                self.vin_hidden.close.notify_waiters();
             }
 
-            async fn start(self) -> ::vin_macros::vin_core::Addr<Self> {
-                let ret = ::vin_macros::vin_core::Addr::new(self);
+            async fn start(self) -> ::vin::vin_macros::vin_core::Addr<Self> {
+                ::vin::vin_macros::vin_core::add_actor();
+
+                let ret = ::vin::vin_macros::vin_core::Addr::new(self);
                 let self = ret.clone();
 
-                ::vin_macros::tokio::spawn(async move {
-                    println!("State: {:?}", self.vin_hidden.state);
-                    #(
-                    let mut #msg_fut_names = ::vin_macros::futures::future::poll_fn(|_| {
-                        if let Some(val) = self.vin_hidden.mailbox.#msg_short_names.pop() {
-                            ::core::task::Poll::Ready(val)
-                        } else {
-                            ::core::task::Poll::Pending
-                        }
-                    });
+                ::vin::vin_macros::tokio::spawn(async move {
+                    let shutdown = ::vin::vin_macros::vin_core::SHUTDOWN_SIGNAL.notified();
+                    let close = self.vin_hidden.close.notified();
+                    ::vin::vin_macros::tokio::pin!(shutdown);
+                    ::vin::vin_macros::tokio::pin!(close);
 
-                    )*
-
-                    #on_started;
-                    self.vin_hidden.state.store(::vin_macros::vin_core::State::Starting);
+                    ::vin::vin_macros::tracing::debug!("{}::on_started()", stringify!(#name));
+                    self.vin_hidden.state.store(::vin::vin_macros::vin_core::State::Starting);
                     self.on_started().await;
-                    self.vin_hidden.state.store(::vin_macros::vin_core::State::Running);
+                    self.vin_hidden.state.store(::vin::vin_macros::vin_core::State::Running);
                     loop {
-                        match self.vin_hidden.state.load() {
-                            ::vin_macros::vin_core::State::Running => {},
-                            ::vin_macros::vin_core::State::Closing => break,
-                            _ => unreachable!("vin: invalid state found in task loop; shouldn't happen ever"),
-                        }
-
                         use ::core::borrow::Borrow;
-                        ::vin_macros::tokio::select! {#(
-                            #msg_short_names = &mut #msg_fut_names => {
-                                #handling;
-                                <Self as ::vin_macros::vin_core::Handler<#msg_names>>::handle(self.borrow(), #msg_short_names).await
-                            }
-                        ),*};
+                        ::vin::vin_macros::tokio::select! {
+                            #(#msg_short_names = self.vin_hidden.mailbox.#msg_short_names.1.recv() => {
+                                let #msg_short_names = #msg_short_names.expect("channel should never be closed while the actor is running");
+                                ::vin::vin_macros::tracing::debug!("{}::handle::<{}>()", stringify!(#name), stringify!(#msg_names));
+                                <Self as ::vin::vin_macros::vin_core::Handler<#msg_names>>::handle(self.borrow(), #msg_short_names).await;
+                            }),*
+                            _ = &mut close => {
+                                ::vin::vin_macros::tracing::debug!("{} received close signal", stringify!(#name));
+                                self.vin_hidden.state.store(::vin::vin_macros::vin_core::State::Closing);
+                                break;
+                            },
+                            _ = &mut shutdown => {
+                                ::vin::vin_macros::tracing::debug!("{} received shutdown signal", stringify!(#name));
+                                self.vin_hidden.state.store(::vin::vin_macros::vin_core::State::Closing);
+                                break;
+                            },
+                        };
                     }
-                    #on_closing;
+                    ::vin::vin_macros::tracing::debug!("{}::on_closing()", stringify!(#name));
                     self.on_closing().await;
-                    #on_closed;
-                    self.vin_hidden.state.store(::vin_macros::vin_core::State::Closed);
+                    ::vin::vin_macros::tracing::debug!("{}::on_closed()", stringify!(#name));
+                    self.vin_hidden.state.store(::vin::vin_macros::vin_core::State::Closed);
                     self.on_closed().await;
+                    ::vin::vin_macros::vin_core::remove_actor();
                 });
                 
                 ret
@@ -374,31 +361,40 @@ fn form_forwarder_impls(
 ) -> TokenStream2 {
     let streams = handles_attrs.iter()
         .map(|attr| {
+            let type_path = &attr.message_type.path;
             let short_name = attr.message_type.path.segments.last().unwrap().ident.to_string().to_lowercase();
             let short_name = quote::format_ident!("{}", short_name);
             let quoted = if let Some(Bounded { size: _, mode }) = &attr.bounded {
                 match mode {
-                    BoundedMode::Overwrite => {
+                    BoundedMode::Wait => {
                         quote! {
-                            let _ = self.vin_hidden.mailbox.#short_name.push(msg);
+                            self.vin_hidden.mailbox.#short_name.0.send(msg).await
+                                .expect("mailbox channel should never be closed during the actor's lifetime");
                         }
                     },
                     BoundedMode::Report => {
                         quote! { 
-                            if let Err(err) = self.vin_hidden.mailbox.#short_name.push(msg) {
-                                tracing::error!("{:?}", err);
+                            if let Err(err) = self.vin_hidden.mailbox.#short_name.0.try_send(msg) {
+                                match err {
+                                    ::vin::vin_macros::async_channel::TrySendError::Full(_) => {
+                                        ::vin::vin_macros::tracing::error!("mailbox for {:?} is full", stringify!(#type_path));
+                                    },
+                                    ::vin::vin_macros::async_channel::TrySendError::Closed(_) => {
+                                        unreachable!("mailbox channel should never be closed during the actor's lifetime");
+                                    },
+                                }
                             }
                         }
                     },
                     BoundedMode::Silent => {
                         quote! {
-                            let _ = self.vin_hidden.mailbox.#short_name.push(msg);
+                            let _ = self.vin_hidden.mailbox.#short_name.0.try_send(msg);
                         }
                     },
                 }
             } else {
                 quote! {
-                    self.vin_hidden.mailbox.#short_name.push(msg);
+                    let _ = self.vin_hidden.mailbox.#short_name.0.try_send(msg);
                 }
             };
 
@@ -406,8 +402,9 @@ fn form_forwarder_impls(
         })
         .map(|(msg_name, body)| {
             quote! {
-                impl #impl_generics ::vin_macros::vin_core::Forwarder<#msg_name> for #name #ty_generics #where_clause {
-                    fn forward(&self, msg: #msg_name) {
+                #[::vin::vin_macros::async_trait::async_trait]
+                impl #impl_generics ::vin::vin_macros::vin_core::Forwarder<#msg_name> for #name #ty_generics #where_clause {
+                    async fn forward(&self, msg: #msg_name) {
                         #body
                     }
                 }
