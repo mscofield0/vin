@@ -3,7 +3,7 @@ A decentralized, ergonomic actor crate.
 
 ```toml
 [dependencies]
-vin = "0.1"
+vin = "0.2"
 ```
 
 ## Overview
