@@ -14,6 +14,9 @@ struct MyActor {
 }
 
 #[async_trait]
+impl vin::LifecycleHook for MyActor {}
+
+#[async_trait]
 impl vin::Handler<Msg> for MyActor {
     async fn handle(&self, msg: Msg) {
         let ctx = self.ctx().await;

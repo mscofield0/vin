@@ -9,9 +9,7 @@ pub enum Msg {
 
 #[vin::actor]
 #[vin::handles(Msg, bounded(size = 2, silent))]
-struct MyActor {
-    pub number: u32,
-}
+struct MyActor;
 
 #[async_trait]
 impl vin::Handler<Msg> for MyActor {
@@ -19,6 +17,9 @@ impl vin::Handler<Msg> for MyActor {
         println!("The message is: {:?}", msg);
     }
 }
+
+#[async_trait]
+impl vin::LifecycleHook for MyActor {}
 
 #[cfg(test)]
 mod tests {
@@ -32,7 +33,7 @@ mod tests {
             .with_max_level(Level::TRACE)
             .init();
 
-        let ctx = VinContextMyActor { number: 42 };
+        let ctx = VinContextMyActor;
         let actor = MyActor::new(ctx).start().await;
         tokio::join!(
             actor.send(Msg::Bar),

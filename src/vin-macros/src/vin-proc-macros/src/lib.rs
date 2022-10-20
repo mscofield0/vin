@@ -79,14 +79,29 @@ impl Parse for HandlesAttribute {
     }
 }
 
+/// A noop macro attribute. Check `vin::actor` for more information.
 #[proc_macro_attribute]
 pub fn handles(_args: TokenStream, _input: TokenStream) -> TokenStream {
     quote! {}.into()
 }
 
-/// Main macro for vin.
-///
 /// Generates the actor impls and forms necessary fields.
+/// 
+/// ## Additional arguments
+/// Currently there is only one additional argument and it's 'bounded'.
+/// 
+/// ### `bounded`
+/// The `bounded` argument allows you to set an upper limit to the amount of messages a mailbox 
+/// can take in. It also allows you to set a strategy for handling a full mailbox. Current 
+/// available strategies are: 'wait' (awaits until the mailbox is available), 'report' (reports a failure) 
+/// and 'silent' (silently discards the message).
+/// 
+/// ## Example
+/// ```rust
+/// #[vin::actor]
+/// #[vin::handles(Message, bounded(size = 1024, report))]
+/// struct MyActor;
+/// ```
 #[proc_macro_attribute]
 pub fn actor(_args: TokenStream, input: TokenStream) -> TokenStream {
     let mut input = parse_macro_input!(input as DeriveInput);
@@ -302,13 +317,17 @@ fn form_actor_trait(
                 self.vin_hidden.close.notify_waiters();
             }
 
-            async fn start(self) -> ::vin::vin_macros::vin_core::Addr<Self> {
+            async fn start(self) -> ::vin::vin_macros::vin_core::Addr<Self>
+                where Self: LifecycleHook 
+            {
                 ::vin::vin_macros::vin_core::add_actor();
 
                 let ret = ::vin::vin_macros::vin_core::Addr::new(self);
                 let self = ret.clone();
 
                 ::vin::vin_macros::tokio::spawn(async move {
+                    use ::core::borrow::Borrow;
+
                     let shutdown = ::vin::vin_macros::vin_core::SHUTDOWN_SIGNAL.notified();
                     let close = self.vin_hidden.close.notified();
                     ::vin::vin_macros::tokio::pin!(shutdown);
@@ -316,10 +335,9 @@ fn form_actor_trait(
 
                     ::vin::vin_macros::tracing::debug!("{}::on_started()", stringify!(#name));
                     self.vin_hidden.state.store(::vin::vin_macros::vin_core::State::Starting);
-                    self.on_started().await;
+                    <Self as ::vin::vin_macros::vin_core::LifecycleHook>::on_started(self.borrow()).await;
                     self.vin_hidden.state.store(::vin::vin_macros::vin_core::State::Running);
                     loop {
-                        use ::core::borrow::Borrow;
                         ::vin::vin_macros::tokio::select! {
                             #(#msg_short_names = self.vin_hidden.mailbox.#msg_short_names.1.recv() => {
                                 let #msg_short_names = #msg_short_names.expect("channel should never be closed while the actor is running");
@@ -339,10 +357,10 @@ fn form_actor_trait(
                         };
                     }
                     ::vin::vin_macros::tracing::debug!("{}::on_closing()", stringify!(#name));
-                    self.on_closing().await;
+                    <Self as ::vin::vin_macros::vin_core::LifecycleHook>::on_closing(self.borrow()).await;
                     ::vin::vin_macros::tracing::debug!("{}::on_closed()", stringify!(#name));
                     self.vin_hidden.state.store(::vin::vin_macros::vin_core::State::Closed);
-                    self.on_closed().await;
+                    <Self as ::vin::vin_macros::vin_core::LifecycleHook>::on_closed(self.borrow()).await;
                     ::vin::vin_macros::vin_core::remove_actor();
                 });
                 
