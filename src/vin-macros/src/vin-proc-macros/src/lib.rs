@@ -328,6 +328,7 @@ fn form_actor_trait(
                 ::vin::vin_macros::tokio::spawn(async move {
                     use ::core::borrow::Borrow;
 
+                    let mut handler_join_set = ::vin::vin_macros::tokio::task::JoinSet::new();
                     let shutdown = ::vin::vin_macros::vin_core::SHUTDOWN_SIGNAL.notified();
                     let close = self.vin_hidden.close.notified();
                     ::vin::vin_macros::tokio::pin!(shutdown);
@@ -342,7 +343,11 @@ fn form_actor_trait(
                             #(#msg_short_names = self.vin_hidden.mailbox.#msg_short_names.1.recv() => {
                                 let #msg_short_names = #msg_short_names.expect("channel should never be closed while the actor is running");
                                 ::vin::vin_macros::tracing::debug!("{}::handle::<{}>()", stringify!(#name), stringify!(#msg_names));
-                                <Self as ::vin::vin_macros::vin_core::Handler<#msg_names>>::handle(self.borrow(), #msg_short_names).await;
+
+                                let self2 = self.clone();
+                                handler_join_set.spawn(async move {
+                                    <Self as ::vin::vin_macros::vin_core::Handler<#msg_names>>::handle(self2.borrow(), #msg_short_names).await
+                                });
                             }),*
                             _ = &mut close => {
                                 ::vin::vin_macros::tracing::debug!("{} received close signal", stringify!(#name));
@@ -354,8 +359,37 @@ fn form_actor_trait(
                                 self.vin_hidden.state.store(::vin::vin_macros::vin_core::State::Closing);
                                 break;
                             },
+                            Some(res) = handler_join_set.join_next() => match res {
+                                Ok(handler_res) => if let Err(err) = handler_res {
+                                    ::vin::vin_macros::tracing::error!("{}::handle::<{}>() failed with error: {:?}", stringify!(#name), err.msg_name(), err);
+                                },
+                                Err(join_err) => if let Ok(reason) = join_err.try_into_panic() {
+                                    ::std::panic::resume_unwind(reason);
+                                },
+                            },
                         };
                     }
+
+                    // Give some time for the existing handlers to gracefully end
+                    use ::core::time::Duration;
+                    let _ = ::vin::vin_macros::tokio::time::timeout(Duration::from_secs(1), async {
+                        while let Some(res) = handler_join_set.join_next().await {
+                            match res {
+                                Ok(handler_res) => if let Err(err) = handler_res {
+                                    ::vin::vin_macros::tracing::error!("{}::handle::<{}>() failed with error: {:?}", stringify!(#name), err.msg_name(), err);
+                                },
+                                Err(join_err) => if let Ok(reason) = join_err.try_into_panic() {
+                                    ::std::panic::resume_unwind(reason);
+                                },
+                            }
+                        }
+                    }).await;
+
+                    // After aborting, the join set still needs to be drained since tasks only get cancelled
+                    // on an 'await' point
+                    handler_join_set.abort_all();
+                    while handler_join_set.join_next().await.is_some() {}
+
                     ::vin::vin_macros::tracing::debug!("{}::on_closing()", stringify!(#name));
                     <Self as ::vin::vin_macros::vin_core::LifecycleHook>::on_closing(self.borrow()).await;
                     ::vin::vin_macros::tracing::debug!("{}::on_closed()", stringify!(#name));

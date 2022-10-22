@@ -4,7 +4,7 @@ use std::{sync::atomic::{AtomicUsize, Ordering::*}, time::Duration};
 
 /// Marker trait indicating that the type is a message.
 pub trait Message {}
-impl<T> Message for T {}
+impl<T> Message for T where T: Sized {}
 
 /// Forwards the message to the respective mailbox.
 #[async_trait]
@@ -15,7 +15,31 @@ pub trait Forwarder<M: Message> {
 /// Handler for specifying message handling logic.
 #[async_trait]
 pub trait Handler<M: Message> {
-    async fn handle(&self, msg: M);
+    type Error;
+
+    async fn handle(&self, msg: M) -> Result<(), HandlerError<M, Self::Error>>;
+}
+
+/// Helper wrapper that provides message name information alongside the handler error.
+pub struct HandlerError<M: Message, E> {
+    inner: E,
+    _phant: ::core::marker::PhantomData<M>,
+}
+
+impl<M: Message, E> HandlerError<M, E> {
+    pub fn new(err: E) -> Self {
+        Self { inner: err, _phant: Default::default() }
+    }
+
+    pub fn msg_name(&self) -> &'static str {
+        ::core::any::type_name::<M>()
+    }
+}
+
+impl<M: Message, E: ::core::fmt::Debug> ::core::fmt::Debug for HandlerError<M, E> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.inner.fmt(f)
+    }
 }
 
 /// Actor trait that all actors must implement.
