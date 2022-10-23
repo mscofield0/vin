@@ -1,5 +1,5 @@
 # vin
-A decentralized, ergonomic actor crate.
+A ergonomic actor crate.
 
 ```toml
 [dependencies]
