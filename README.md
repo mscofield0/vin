@@ -39,11 +39,11 @@ impl vin::LifecycleHook for MyActor {}
 
 #[async_trait]
 impl vin::Handler<Msg> for MyActor {
-    type Error = String;
-
-    async fn handle(&self, msg: Msg) -> Result<(), HandlerError<Msg, Self::Error>> {
+    async fn handle(&self, msg: Msg) -> anyhow::Result<()> {
         let ctx = self.ctx().await;
         println!("The message is: {:?} and the number is {}", msg, ctx.number);
+
+        Ok(())
     }
 }
 
