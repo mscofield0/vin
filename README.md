@@ -10,7 +10,7 @@ vin = "0.2"
 
 Vin's goal is to be an ergonomic actor library. The reason many actor libraries are so tedious to use is because they rely on a central `System` that needs to be shared among all actors. Vin ditches that burden by making every actor instance completely independent. Each actor gets its own task to poll messages and execute handlers on. Its address is shared by a simple `Arc`. Vin also provides a way to gracefully shutdown all actors without having to do the manual labour yourself. Actor data is stored in its actor context and is retrievable for reading with `Actor::ctx()` and for writing with `Actor::ctx_mut()` which acquire a `RwLock` to the data.
 
-Vin completely relies on [`tokio`](https://github.com/tokio-rs/tokio) (for the async runtime), [`tracing`](https://github.com/tokio-rs/tracing) (for diagnostics) and [`async_trait`](https://github.com/dtolnay/async-trait).
+Vin completely relies on [`tokio`](https://github.com/tokio-rs/tokio) (for the async runtime), [`tracing`](https://github.com/tokio-rs/tracing) (for diagnostics), [`async_trait`](https://github.com/dtolnay/async-trait) and [`anyhow`](https://github.com/dtolnay/anyhow) (as the handler error type).
 
 ## Example
 
