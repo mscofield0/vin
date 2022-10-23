@@ -1,5 +1,5 @@
 # vin
-A ergonomic actor crate.
+An ergonomic actor crate.
 
 ```toml
 [dependencies]
