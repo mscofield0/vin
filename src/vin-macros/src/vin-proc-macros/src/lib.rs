@@ -346,7 +346,10 @@ fn form_actor_trait(
 
                                 let self2 = self.clone();
                                 handler_join_set.spawn(async move {
-                                    <Self as ::vin::vin_macros::vin_core::Handler<#msg_names>>::handle(self2.borrow(), #msg_short_names).await
+                                    match <Self as ::vin::vin_macros::vin_core::Handler<#msg_names>>::handle(self2.borrow(), #msg_short_names).await {
+                                        Ok(_) => Ok(()),
+                                        Err(err) => Err(::vin::vin_macros::vin_core::HandlerError::new(stringify!(#msg_names), err)),
+                                    }
                                 });
                             }),*
                             _ = &mut close => {
@@ -361,7 +364,7 @@ fn form_actor_trait(
                             },
                             Some(res) = handler_join_set.join_next() => match res {
                                 Ok(handler_res) => if let Err(err) = handler_res {
-                                    ::vin::vin_macros::tracing::error!("{}::handle::<{}>() failed with error: {:?}", stringify!(#name), err.msg_name(), err);
+                                    ::vin::vin_macros::tracing::error!("{}::handle::<{}>() failed with error: {:#?}", stringify!(#name), err.msg_name(), err);
                                 },
                                 Err(join_err) => if let Ok(reason) = join_err.try_into_panic() {
                                     ::std::panic::resume_unwind(reason);
@@ -376,7 +379,7 @@ fn form_actor_trait(
                         while let Some(res) = handler_join_set.join_next().await {
                             match res {
                                 Ok(handler_res) => if let Err(err) = handler_res {
-                                    ::vin::vin_macros::tracing::error!("{}::handle::<{}>() failed with error: {:?}", stringify!(#name), err.msg_name(), err);
+                                    ::vin::vin_macros::tracing::error!("{}::handle::<{}>() failed with error: {:#?}", stringify!(#name), err.msg_name(), err);
                                 },
                                 Err(join_err) => if let Ok(reason) = join_err.try_into_panic() {
                                     ::std::panic::resume_unwind(reason);

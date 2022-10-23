@@ -13,12 +13,10 @@ struct MyActor;
 
 #[async_trait]
 impl vin::Handler<Msg> for MyActor {
-    type Error = String;
-
-    async fn handle(&self, msg: Msg) -> Result<(), HandlerError<Msg, Self::Error>> {
+    async fn handle(&self, msg: Msg) -> anyhow::Result<()> {
         println!("The message is: {:?}", msg);
 
-        Err(HandlerError::new(String::from("hi, i am error")))
+        Err(anyhow::anyhow!("hi, i am error"))
     }
 }
 

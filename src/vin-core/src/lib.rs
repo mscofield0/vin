@@ -1,3 +1,5 @@
+pub use anyhow;
+
 use async_trait::async_trait;
 use tokio::sync::Notify;
 use std::{sync::atomic::{AtomicUsize, Ordering::*}, time::Duration};
@@ -15,28 +17,26 @@ pub trait Forwarder<M: Message> {
 /// Handler for specifying message handling logic.
 #[async_trait]
 pub trait Handler<M: Message> {
-    type Error;
-
-    async fn handle(&self, msg: M) -> Result<(), HandlerError<M, Self::Error>>;
+    async fn handle(&self, msg: M) -> anyhow::Result<()>;
 }
 
 /// Helper wrapper that provides message name information alongside the handler error.
-pub struct HandlerError<M: Message, E> {
-    inner: E,
-    _phant: ::core::marker::PhantomData<M>,
+pub struct HandlerError {
+    inner: anyhow::Error,
+    msg_name: &'static str,
 }
 
-impl<M: Message, E> HandlerError<M, E> {
-    pub fn new(err: E) -> Self {
-        Self { inner: err, _phant: Default::default() }
+impl HandlerError {
+    pub fn new(msg_name: &'static str, err: anyhow::Error) -> Self {
+        Self { msg_name, inner: err }
     }
 
     pub fn msg_name(&self) -> &'static str {
-        ::core::any::type_name::<M>()
+        self.msg_name
     }
 }
 
-impl<M: Message, E: ::core::fmt::Debug> ::core::fmt::Debug for HandlerError<M, E> {
+impl ::core::fmt::Debug for HandlerError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.inner.fmt(f)
     }

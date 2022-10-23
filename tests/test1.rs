@@ -1,14 +1,22 @@
 use vin::*;
 
 #[derive(Debug, Clone)]
-pub enum Msg {
+pub enum MsgA {
+    Foo,
+    Bar,
+    Baz,
+}
+
+#[derive(Debug, Clone)]
+pub enum MsgB {
     Foo,
     Bar,
     Baz,
 }
 
 #[vin::actor]
-#[vin::handles(Msg)]
+#[vin::handles(MsgA)]
+#[vin::handles(MsgB)]
 struct MyActor {
     pub number: u32,
 }
@@ -17,14 +25,22 @@ struct MyActor {
 impl vin::LifecycleHook for MyActor {}
 
 #[async_trait]
-impl vin::Handler<Msg> for MyActor {
-    type Error = String;
-
-    async fn handle(&self, msg: Msg) -> Result<(), HandlerError<Msg, Self::Error>> {
+impl vin::Handler<MsgA> for MyActor {
+    async fn handle(&self, msg: MsgA) -> anyhow::Result<()> {
         let ctx = self.ctx().await;
         println!("The message is: {:?} and the number is {}", msg, ctx.number);
 
-        Err(HandlerError::new(String::from("hi, i am error")))
+        Err(anyhow::anyhow!("hi, i am error"))
+    }
+}
+
+#[async_trait]
+impl vin::Handler<MsgB> for MyActor {
+    async fn handle(&self, msg: MsgB) -> anyhow::Result<()> {
+        let ctx = self.ctx().await;
+        println!("The message is: {:?} and the number is {}", msg, ctx.number);
+
+        Err(anyhow::anyhow!("hi, i am error"))
     }
 }
 
@@ -42,7 +58,8 @@ mod tests {
 
         let ctx = VinContextMyActor { number: 42 };
         let actor = MyActor::new(ctx).start().await;
-        actor.send(Msg::Bar).await;
+        actor.send(MsgA::Bar).await;
+        actor.send(MsgB::Bar).await;
         tokio::time::sleep(Duration::from_millis(500)).await;
         vin_core::shutdown();
         vin_core::wait_for_shutdowns().await;
