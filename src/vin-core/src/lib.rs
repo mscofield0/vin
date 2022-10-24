@@ -50,13 +50,13 @@ pub trait Actor {
     type Context;
 
     // impl'd by derive macro
-    fn new(ctx: Self::Context) -> Self;
+    fn new(ctx: Self::Context) -> Addr<Self>;
     fn state(&self) -> State;
     fn close(&self);
     async fn ctx(&self) -> tokio::sync::RwLockReadGuard<Self::Context>;
     async fn ctx_mut(&self) -> tokio::sync::RwLockWriteGuard<Self::Context>;
     async fn send<M: Message + Send>(&self, msg: M) where Self: Forwarder<M>;
-    async fn start(self) -> Addr<Self>
+    async fn start(self: &Addr<Self>) -> Addr<Self>
         where Self: LifecycleHook;
 
     // blanket

@@ -287,11 +287,11 @@ fn form_actor_trait(
         impl #impl_generics ::vin::vin_macros::vin_core::Actor for #name #ty_generics #where_clause {
             type Context = #context_name;
 
-            fn new(ctx: Self::Context) -> Self {
-                Self {
+            fn new(ctx: Self::Context) -> ::vin::vin_macros::vin_core::Addr<Self> {
+                ::vin::vin_macros::vin_core::Addr::new(Self {
                     vin_ctx: ::vin::vin_macros::tokio::sync::RwLock::new(ctx),
                     vin_hidden: Default::default(),
-                }
+                })
             }
 
             async fn send<M: ::vin::vin_macros::vin_core::Message + Send>(&self, msg: M)
@@ -317,34 +317,36 @@ fn form_actor_trait(
                 self.vin_hidden.close.notify_waiters();
             }
 
-            async fn start(self) -> ::vin::vin_macros::vin_core::Addr<Self>
+            async fn start(self: &::vin::vin_macros::vin_core::Addr<Self>) -> ::vin::vin_macros::vin_core::Addr<Self>
                 where Self: LifecycleHook 
             {
+                // Prevent multiple starts
+                if let Err(_) = self.vin_hidden.state.compare_exchange(::vin::vin_macros::vin_core::State::Pending, ::vin::vin_macros::vin_core::State::Starting) {
+                    return self.clone();
+                }
+
                 ::vin::vin_macros::vin_core::add_actor();
-
-                let ret = ::vin::vin_macros::vin_core::Addr::new(self);
-                let self = ret.clone();
-
+                let ret = self.clone();
+                let actor = self.clone();
                 ::vin::vin_macros::tokio::spawn(async move {
                     use ::core::borrow::Borrow;
 
                     let mut handler_join_set = ::vin::vin_macros::tokio::task::JoinSet::new();
                     let shutdown = ::vin::vin_macros::vin_core::SHUTDOWN_SIGNAL.notified();
-                    let close = self.vin_hidden.close.notified();
+                    let close = actor.vin_hidden.close.notified();
                     ::vin::vin_macros::tokio::pin!(shutdown);
                     ::vin::vin_macros::tokio::pin!(close);
 
                     ::vin::vin_macros::tracing::debug!("{}::on_started()", stringify!(#name));
-                    self.vin_hidden.state.store(::vin::vin_macros::vin_core::State::Starting);
-                    <Self as ::vin::vin_macros::vin_core::LifecycleHook>::on_started(self.borrow()).await;
-                    self.vin_hidden.state.store(::vin::vin_macros::vin_core::State::Running);
+                    <Self as ::vin::vin_macros::vin_core::LifecycleHook>::on_started(actor.borrow()).await;
+                    actor.vin_hidden.state.store(::vin::vin_macros::vin_core::State::Running);
                     loop {
                         ::vin::vin_macros::tokio::select! {
-                            #(#msg_short_names = self.vin_hidden.mailbox.#msg_short_names.1.recv() => {
+                            #(#msg_short_names = actor.vin_hidden.mailbox.#msg_short_names.1.recv() => {
                                 let #msg_short_names = #msg_short_names.expect("channel should never be closed while the actor is running");
                                 ::vin::vin_macros::tracing::debug!("{}::handle::<{}>()", stringify!(#name), stringify!(#msg_names));
 
-                                let self2 = self.clone();
+                                let self2 = actor.clone();
                                 handler_join_set.spawn(async move {
                                     match <Self as ::vin::vin_macros::vin_core::Handler<#msg_names>>::handle(self2.borrow(), #msg_short_names).await {
                                         Ok(_) => Ok(()),
@@ -354,12 +356,12 @@ fn form_actor_trait(
                             }),*
                             _ = &mut close => {
                                 ::vin::vin_macros::tracing::debug!("{} received close signal", stringify!(#name));
-                                self.vin_hidden.state.store(::vin::vin_macros::vin_core::State::Closing);
+                                actor.vin_hidden.state.store(::vin::vin_macros::vin_core::State::Closing);
                                 break;
                             },
                             _ = &mut shutdown => {
                                 ::vin::vin_macros::tracing::debug!("{} received shutdown signal", stringify!(#name));
-                                self.vin_hidden.state.store(::vin::vin_macros::vin_core::State::Closing);
+                                actor.vin_hidden.state.store(::vin::vin_macros::vin_core::State::Closing);
                                 break;
                             },
                             Some(res) = handler_join_set.join_next() => match res {
@@ -394,13 +396,13 @@ fn form_actor_trait(
                     while handler_join_set.join_next().await.is_some() {}
 
                     ::vin::vin_macros::tracing::debug!("{}::on_closing()", stringify!(#name));
-                    <Self as ::vin::vin_macros::vin_core::LifecycleHook>::on_closing(self.borrow()).await;
+                    <Self as ::vin::vin_macros::vin_core::LifecycleHook>::on_closing(actor.borrow()).await;
                     ::vin::vin_macros::tracing::debug!("{}::on_closed()", stringify!(#name));
-                    self.vin_hidden.state.store(::vin::vin_macros::vin_core::State::Closed);
-                    <Self as ::vin::vin_macros::vin_core::LifecycleHook>::on_closed(self.borrow()).await;
+                    actor.vin_hidden.state.store(::vin::vin_macros::vin_core::State::Closed);
+                    <Self as ::vin::vin_macros::vin_core::LifecycleHook>::on_closed(actor.borrow()).await;
                     ::vin::vin_macros::vin_core::remove_actor();
                 });
-                
+
                 ret
             }
         }

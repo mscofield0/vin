@@ -60,8 +60,8 @@ mod tests {
         let actor = MyActor::new(ctx).start().await;
         actor.send(MsgA::Bar).await;
         actor.send(MsgB::Bar).await;
-        tokio::time::sleep(Duration::from_millis(500)).await;
-        vin_core::shutdown();
-        vin_core::wait_for_shutdowns().await;
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        vin::shutdown();
+        vin::wait_for_shutdowns().await;
     }
 }
