@@ -9,3 +9,6 @@ edition = "2021"
 async-trait = "0.1"
 tokio = { version = "1.21", features = ["sync", "parking_lot", "time"] }
 anyhow = "1.0"
+lazy_static = "1.4"
+async-channel = "1.7"
+downcast-rs = "1.2"
