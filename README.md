@@ -3,7 +3,7 @@ An ergonomic actor crate.
 
 ```toml
 [dependencies]
-vin = "0.2"
+vin = "0.2" # largely wip still
 ```
 
 ## Overview
@@ -54,7 +54,7 @@ async fn main() {
         .init();
 
     let ctx = VinContextMyActor { number: 42 };
-    let actor = MyActor::new(ctx).start().await;
+    let actor = MyActor::new("test", ctx).start().await.unwrap();
     actor.send(Msg::Bar).await;
     tokio::time::sleep(Duration::from_millis(500)).await;
     vin::shutdown();
