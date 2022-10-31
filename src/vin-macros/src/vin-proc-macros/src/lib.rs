@@ -1,7 +1,8 @@
+use itertools::Itertools;
 use proc_macro::TokenStream;
 use proc_macro2::TokenStream as TokenStream2;
 use rassert_rs::rassert;
-use syn::{parse_macro_input, Ident, DeriveInput, parse::Parse, Error, LitInt, TypePath, Token, Data, Fields, parenthesized, ImplGenerics, TypeGenerics, WhereClause};
+use syn::{parse_macro_input, Ident, DeriveInput, parse::Parse, Error, LitInt, TypePath, Token, Data, Fields, parenthesized, ImplGenerics, TypeGenerics, WhereClause, Attribute, PathSegment};
 use quote::quote;
 
 struct HandlesAttribute {
@@ -117,7 +118,7 @@ pub fn actor(_args: TokenStream, input: TokenStream) -> TokenStream {
 
     // Parsed handles attributes
     let handles_attrs = input.attrs.iter()
-        .filter(|attr| !attr.path.is_ident("handles"))
+        .filter(|attr| check_if_attr_from_vin(&attr, "handles"))
         .map(|attr| attr.parse_args::<HandlesAttribute>())
         .collect::<Result<Vec<_>, _>>();
 
@@ -130,11 +131,16 @@ pub fn actor(_args: TokenStream, input: TokenStream) -> TokenStream {
         return Error::new(name.span(), "no message specified for handling").to_compile_error().into();
     }
 
+    // Derives on the actor struct
+    let derives = input.attrs.iter()
+        .filter(|attr| attr.path.is_ident("derive"))
+        .collect::<Vec<_>>();
+
     // All handled message names
     let vin_hidden_struct = form_vin_hidden_struct(name, &handles_attrs);
 
     // Thread-safe, wrapped actor context
-    let vin_context_struct = form_vin_context_struct(name, &data.fields);
+    let vin_context_struct = form_vin_context_struct(name, &data.fields, &derives);
 
     // Forwarder trait impls
     let forwarder_traits = form_forwarder_impls(name, &handles_attrs, &impl_generics, &ty_generics, where_clause);
@@ -147,7 +153,7 @@ pub fn actor(_args: TokenStream, input: TokenStream) -> TokenStream {
     let context_struct_name = form_context_struct_name(name);
 
     // Remove handles attributes
-    input.attrs.retain(|attr| attr.path.segments.last().unwrap().ident != "handles");
+    input.attrs.retain(|attr| !check_if_attr_from_vin(&attr, "handles") && !attr.path.is_ident("derive"));
     let attrs = &input.attrs;
 
     quote! {
@@ -165,6 +171,11 @@ pub fn actor(_args: TokenStream, input: TokenStream) -> TokenStream {
         
         #actor_trait
     }.into()
+}
+
+fn check_if_attr_from_vin(attr: &Attribute, item: &str) -> bool {
+    attr.path.segments.iter().contains(&syn::parse_str::<PathSegment>("vin").unwrap())
+        && attr.path.segments.iter().contains(&syn::parse_str::<PathSegment>(item).unwrap())
 }
 
 fn form_mailbox_name(name: &Ident) -> Ident {
@@ -194,17 +205,20 @@ fn form_message_names(handles_attrs: &Vec<HandlesAttribute>) -> (Vec<TypePath>, 
     (msg_names, msg_short_names)
 }
 
-fn form_vin_context_struct(name: &Ident, fields: &Fields) -> TokenStream2 {
+fn form_vin_context_struct(name: &Ident, fields: &Fields, derives: &Vec<&Attribute>) -> TokenStream2 {
     let context_struct_name = form_context_struct_name(name);
 
     match fields {
         Fields::Named(fields) => quote! {
+            #(#derives)*
             pub struct #context_struct_name #fields
         },
         Fields::Unnamed(fields) => quote! {
+            #(#derives)*
             pub struct #context_struct_name #fields;
         },
         Fields::Unit => quote! {
+            #(#derives)*
             pub struct #context_struct_name;
         }
     }

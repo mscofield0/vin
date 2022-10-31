@@ -17,6 +17,7 @@ pub enum MsgB {
 #[vin::actor]
 #[vin::handles(MsgA)]
 #[vin::handles(MsgB)]
+#[derive(Debug, Clone)]
 struct MyActor {
     pub number: u32,
 }
