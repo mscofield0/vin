@@ -48,6 +48,7 @@ impl vin::Handler<MsgB> for MyActor {
 mod tests {
     use std::time::Duration;
     use tracing::Level;
+    use vin_core::StrongErasedAddr;
     use super::*;
 
     #[tokio::test]
@@ -57,9 +58,13 @@ mod tests {
             .init();
 
         let ctx = VinContextMyActor { number: 42 };
-        let actor = MyActor::new(ctx).start().await;
+        let actor = MyActor::new("test", ctx).start().await.unwrap();
+        vin::send_to("test", MsgA::Bar).await;
+        vin::send(actor.clone(), MsgA::Bar).await;
+        vin::send_erased(actor.clone() as StrongErasedAddr, MsgA::Bar).await;
         actor.send(MsgA::Bar).await;
         actor.send(MsgB::Bar).await;
+        actor.send_erased(Box::new(MsgA::Bar)).await;
         tokio::time::sleep(Duration::from_millis(100)).await;
         vin::shutdown();
         vin::wait_for_shutdowns().await;

@@ -333,6 +333,7 @@ fn form_vin_hidden_struct(name: &Ident, handles_attrs: &Vec<HandlesAttribute>) -
             mailbox: #mailbox_struct_name,
             state: ::vin::vin_macros::crossbeam::atomic::AtomicCell<::vin::vin_macros::vin_core::State>,
             close: ::vin::vin_macros::tokio::sync::Notify,
+            id: ::vin::vin_macros::vin_core::ActorId,
         }
 
         impl Default for #hidden_struct_name {
@@ -341,6 +342,7 @@ fn form_vin_hidden_struct(name: &Ident, handles_attrs: &Vec<HandlesAttribute>) -
                     mailbox: Default::default(),
                     state: Default::default(),
                     close: Default::default(),
+                    id: "none".into(),
                 }
             }
         }
@@ -358,16 +360,20 @@ fn form_actor_trait(
 ) -> TokenStream2 {
     let (msg_names, msg_short_names) = form_message_names(&handles_attrs);
     let context_name = form_context_struct_name(name);
+    let hidden_name = form_hidden_struct_name(name);
 
     quote! {
         #[::vin::vin_macros::async_trait::async_trait]
         impl #impl_generics ::vin::vin_macros::vin_core::Actor for #name #ty_generics #where_clause {
             type Context = #context_name;
 
-            fn new(ctx: Self::Context) -> ::vin::vin_macros::vin_core::StrongAddr<Self> {
+            fn new<Id: Into<::vin::vin_macros::vin_core::ActorId>>(id: Id, ctx: Self::Context) -> ::vin::vin_macros::vin_core::StrongAddr<Self> {
                 ::vin::vin_macros::vin_core::StrongAddr::new(Self {
                     vin_ctx: ::vin::vin_macros::tokio::sync::RwLock::new(ctx),
-                    vin_hidden: Default::default(),
+                    vin_hidden: #hidden_name {
+                        id: id.into(),
+                        ..Default::default()
+                    },
                 })
             }
 
@@ -379,14 +385,25 @@ fn form_actor_trait(
                 self.vin_ctx.write().await
             }
 
-            async fn start(self: &::vin::vin_macros::vin_core::StrongAddr<Self>) -> ::vin::vin_macros::vin_core::StrongAddr<Self>
-            {
+            async fn start(self: &::vin::vin_macros::vin_core::StrongAddr<Self>) -> Result<::vin::vin_macros::vin_core::StrongAddr<Self>, ::vin::vin_macros::vin_core::StartError> {
                 // Prevent multiple starts
                 if let Err(_) = self.vin_hidden.state.compare_exchange(::vin::vin_macros::vin_core::State::Pending, ::vin::vin_macros::vin_core::State::Starting) {
-                    return self.clone();
+                    return Err(::vin::vin_macros::vin_core::StartError::AlreadyStarted);
                 }
 
-                ::vin::vin_macros::vin_core::add_actor();
+                let id = self.vin_hidden.id.clone();
+
+                // Add actor to global registry
+                {
+                    let mut reg = ::vin::vin_macros::vin_core::REGISTRY.lock().await;
+                    if reg.contains_key(&id) {
+                        return Err(::vin::vin_macros::vin_core::StartError::AlreadyTakenId(id.clone()));
+                    }
+
+                    ::vin::vin_macros::vin_core::add_actor();
+                    reg.insert(id.clone(), ::std::sync::Arc::downgrade(&self) as ::vin::vin_macros::vin_core::WeakErasedAddr);
+                }
+
                 let ret = self.clone();
                 let actor = self.clone();
                 ::vin::vin_macros::tokio::spawn(async move {
@@ -398,14 +415,15 @@ fn form_actor_trait(
                     ::vin::vin_macros::tokio::pin!(shutdown);
                     ::vin::vin_macros::tokio::pin!(close);
 
-                    ::vin::vin_macros::tracing::debug!("{}::on_started()", stringify!(#name));
+                    ::vin::vin_macros::tracing::debug!("actor '{}' starting...", id);
                     <Self as ::vin::vin_macros::vin_core::LifecycleHook>::on_started(actor.borrow()).await;
                     actor.vin_hidden.state.store(::vin::vin_macros::vin_core::State::Running);
+                    ::vin::vin_macros::tracing::debug!("actor '{}' started", id);
                     loop {
                         ::vin::vin_macros::tokio::select! {
                             #(#msg_short_names = actor.vin_hidden.mailbox.#msg_short_names.1.recv() => {
                                 let #msg_short_names = #msg_short_names.expect("channel should never be closed while the actor is running");
-                                ::vin::vin_macros::tracing::debug!("{}::handle::<{}>()", stringify!(#name), stringify!(#msg_names));
+                                ::vin::vin_macros::tracing::debug!("actor '{}' handling '{}'", id, stringify!(#msg_names));
 
                                 let self2 = actor.clone();
                                 handler_join_set.spawn(async move {
@@ -416,18 +434,18 @@ fn form_actor_trait(
                                 });
                             }),*
                             _ = &mut close => {
-                                ::vin::vin_macros::tracing::debug!("{} received close signal", stringify!(#name));
+                                ::vin::vin_macros::tracing::debug!("actor '{}' received close signal", id);
                                 actor.vin_hidden.state.store(::vin::vin_macros::vin_core::State::Closing);
                                 break;
                             },
                             _ = &mut shutdown => {
-                                ::vin::vin_macros::tracing::debug!("{} received shutdown signal", stringify!(#name));
+                                ::vin::vin_macros::tracing::debug!("actor '{}' received shutdown signal", id);
                                 actor.vin_hidden.state.store(::vin::vin_macros::vin_core::State::Closing);
                                 break;
                             },
                             Some(res) = handler_join_set.join_next() => match res {
                                 Ok(handler_res) => if let Err(err) = handler_res {
-                                    ::vin::vin_macros::tracing::error!("{}::handle::<{}>() failed with error: {:#?}", stringify!(#name), err.msg_name(), err);
+                                    ::vin::vin_macros::tracing::error!("actor '{}' handling of '{}' failed with error: {:#?}", id, err.msg_name(), err);
                                 },
                                 Err(join_err) => if let Ok(reason) = join_err.try_into_panic() {
                                     ::std::panic::resume_unwind(reason);
@@ -437,12 +455,13 @@ fn form_actor_trait(
                     }
 
                     // Give some time for the existing handlers to gracefully end
+                    ::vin::vin_macros::tracing::debug!("actor '{}' is closing...", id);
                     use ::core::time::Duration;
                     let _ = ::vin::vin_macros::tokio::time::timeout(Duration::from_secs(1), async {
                         while let Some(res) = handler_join_set.join_next().await {
                             match res {
                                 Ok(handler_res) => if let Err(err) = handler_res {
-                                    ::vin::vin_macros::tracing::error!("{}::handle::<{}>() failed with error: {:#?}", stringify!(#name), err.msg_name(), err);
+                                    ::vin::vin_macros::tracing::error!("actor '{}' handling of '{}' failed with error: {:#?}", id, err.msg_name(), err);
                                 },
                                 Err(join_err) => if let Ok(reason) = join_err.try_into_panic() {
                                     ::std::panic::resume_unwind(reason);
@@ -456,15 +475,20 @@ fn form_actor_trait(
                     handler_join_set.abort_all();
                     while handler_join_set.join_next().await.is_some() {}
 
-                    ::vin::vin_macros::tracing::debug!("{}::on_closing()", stringify!(#name));
-                    <Self as ::vin::vin_macros::vin_core::LifecycleHook>::on_closing(actor.borrow()).await;
-                    ::vin::vin_macros::tracing::debug!("{}::on_closed()", stringify!(#name));
-                    actor.vin_hidden.state.store(::vin::vin_macros::vin_core::State::Closed);
+                    // Run the lifecycle on_closed hook
                     <Self as ::vin::vin_macros::vin_core::LifecycleHook>::on_closed(actor.borrow()).await;
+                    actor.vin_hidden.state.store(::vin::vin_macros::vin_core::State::Closed);
+                    ::vin::vin_macros::tracing::debug!("actor '{}' is closed", id);
+
+                    // Remove the actor from the registry
+                    {
+                        let mut reg = ::vin::vin_macros::vin_core::REGISTRY.lock().await;
+                        reg.remove(&id);
+                    }
                     ::vin::vin_macros::vin_core::remove_actor();
                 });
 
-                ret
+                Ok(ret)
             }
         }
 
@@ -478,9 +502,10 @@ fn form_actor_trait(
             }
 
             async fn send_erased(&self, msg: ::vin::vin_macros::vin_core::BoxedMessage) {
-                let tx = self.vin_hidden.mailbox.erased_mailboxes.get(&msg.id())
+                use ::vin::vin_macros::vin_core::downcast_rs::Downcast;
+                let tx = self.vin_hidden.mailbox.erased_mailboxes.get(&msg.as_ref().as_any().type_id())
                     .expect("sent a message that the actor does not handle");
-                tx.send_erased(msg);
+                tx.send_erased(msg).await;
             }
 
             fn close(&self) {
@@ -490,6 +515,10 @@ fn form_actor_trait(
 
             fn state(&self) -> ::vin::vin_macros::vin_core::State {
                 self.vin_hidden.state.load()
+            }
+
+            fn id(&self) -> &str {
+                &self.vin_hidden.id
             }
         }
     }

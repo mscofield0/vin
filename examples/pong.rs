@@ -17,9 +17,8 @@ struct SendPing;
 #[vin::handles(Pong, bounded(size = 128, wait))]
 #[vin::handles(SendPing, bounded(size = 128, wait))]
 struct PingActor {
-    /// The address of the counterpart actor
-    addr: Option<vin::Addr<PingActor>>, // notice how we didn't specify `Self`, this is because the fields get wrapped into a context struct
-                                        // which in turn means that `Self` becomes the context type and not the actor type 
+    /// Actor id to communicate with
+    other_id: vin::ActorId,
 
     /// Time of the sent ping
     time_of_ping: Option<Instant>,
@@ -31,7 +30,7 @@ impl vin::LifecycleHook for PingActor {}
 impl vin::Handler<Ping> for PingActor {
     async fn handle(&self, _: Ping) -> anyhow::Result<()> {
         let ctx = self.ctx().await;
-        ctx.addr.as_ref().unwrap().send(Pong).await;
+        vin::send_to(&ctx.other_id, Pong).await;
         Ok(())
     }
 }
@@ -42,7 +41,7 @@ impl vin::Handler<Pong> for PingActor {
         let now = Instant::now();
         let mut ctx = self.ctx_mut().await;
         match ctx.time_of_ping {
-            Some(start) => tracing::info!("Other side responded after {}ms.", (now - start).as_millis()),
+            Some(start) => tracing::info!("actor '{}' responded after {}ms.", ctx.other_id, (now - start).as_millis()),
             None => tracing::warn!("Other side responded with a pong message to no ping message."),
         }
         ctx.time_of_ping = None;
@@ -59,7 +58,7 @@ impl vin::Handler<SendPing> for PingActor {
         }
         ctx.time_of_ping = Some(Instant::now());
 
-        ctx.addr.as_ref().unwrap().send(Ping).await;
+        vin::send_to(&ctx.other_id, Ping).await;
         Ok(())
     }
 }
@@ -70,12 +69,11 @@ async fn main() {
         .with_max_level(Level::TRACE)
         .init();
 
-    let a1 = PingActor::new(VinContextPingActor { addr: None, time_of_ping: Default::default() });
-    let a2 = PingActor::new(VinContextPingActor { addr: Some(a1.clone()), time_of_ping: Default::default() });
-    a1.ctx_mut().await.addr = Some(a2.clone());
+    let a1 = PingActor::new("test1", VinContextPingActor { other_id: "test2".into(), time_of_ping: Default::default() });
+    let a2 = PingActor::new("test2", VinContextPingActor { other_id: "test1".into(), time_of_ping: Default::default() });
 
-    a1.start().await;
-    a2.start().await;
+    a1.start().await.unwrap();
+    a2.start().await.unwrap();
 
     a1.send(SendPing).await;
     a2.send(SendPing).await;
