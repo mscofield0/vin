@@ -3,7 +3,7 @@ An ergonomic actor crate.
 
 ```toml
 [dependencies]
-vin = "0.2" # largely wip still
+vin = "2.0"
 ```
 
 ## Overview
