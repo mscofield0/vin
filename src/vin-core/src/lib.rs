@@ -69,7 +69,7 @@ pub enum StartError {
 pub trait Actor: Addr + LifecycleHook {
     type Context;
 
-    // impl'd by derive macro
+    // impl'd by attr macro
     fn new<Id: Into<ActorId> + Send>(id: Id, ctx: Self::Context) -> StrongAddr<Self>;
     async fn ctx(&self) -> tokio::sync::RwLockReadGuard<Self::Context>;
     async fn ctx_mut(&self) -> tokio::sync::RwLockWriteGuard<Self::Context>;
@@ -80,6 +80,7 @@ pub trait Actor: Addr + LifecycleHook {
 /// A restricted interface of `Actor` that provides send mechanics and state reads.
 #[async_trait]
 pub trait Addr: DowncastSync + Sync {
+    // impl'd by attr macro
     async fn send<M: Message>(&self, msg: M) where Self: Forwarder<M> + Sized;
     async fn send_erased(&self, msg: BoxedMessage);
     fn state(&self) -> State;
