@@ -1,5 +1,11 @@
-pub use anyhow;
-pub use downcast_rs;
+#[doc(hidden)] pub use ::tokio;
+#[doc(hidden)] pub use ::futures;
+#[doc(hidden)] pub use ::tracing;
+#[doc(hidden)] pub use ::crossbeam;
+#[doc(hidden)] pub use ::async_trait;
+#[doc(hidden)] pub use ::async_channel;
+#[doc(hidden)] pub use ::anyhow;
+#[doc(hidden)] pub use ::downcast_rs;
 
 use async_trait::async_trait;
 use lazy_static::lazy_static;

@@ -1,16 +1,19 @@
 [package]
 name = "vin-macros"
-version = "0.1.0"
+version = "1.0.0"
+description = "Procedural macros that power vin"
 edition = "2021"
+categories = ["actor", "concurrency", "proc_macro"]
+homepage = "https://github.com/mscofield0/vin"
+repository = "https://github.com/mscofield0/vin"
+keywords = ["actor", "concurrency", "proc_macro"]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+proc-macro = true
 
 [dependencies]
-vin-core = { path = "../vin-core", version = "*" }
-vin-proc-macros = { path = "src/vin-proc-macros", version = "*" }
-tokio = { version = "1.21", features = ["macros", "rt", "rt-multi-thread", "sync", "time"] }
-async-trait = "0.1"
-tracing = "0.1"
-crossbeam = "0.8"
-futures = "0.3"
-async-channel = "1.7"
+quote = "1"
+proc-macro2 = "1.0"
+syn = { version = "1.0", features = ["full"] }
+rassert-rs = "1"
+itertools = "0.10"

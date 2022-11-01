@@ -1,15 +1,23 @@
 [package]
 name = "vin-core"
-version = "0.1.0"
+version = "1.0.0"
 edition = "2021"
+categories = ["actor", "concurrency"]
+description = "Core types and traits for vin"
+homepage = "https://github.com/mscofield0/vin"
+repository = "https://github.com/mscofield0/vin"
+keywords = ["actor", "concurrency"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 async-trait = "0.1"
-tokio = { version = "1.21", features = ["sync", "parking_lot", "time"] }
+tokio = { version = "1.21", features = ["macros", "rt", "rt-multi-thread", "parking_lot", "sync", "time"] }
 anyhow = "1.0"
 thiserror = "1.0"
 lazy_static = "1.4"
-async-channel = "1.7"
 downcast-rs = "1.2"
+tracing = "0.1"
+futures = "0.3"
+crossbeam = "0.8"
+async-channel = "1.7"
