@@ -6,7 +6,8 @@ categories = ["actor", "concurrency"]
 description = "Core types and traits for vin"
 homepage = "https://github.com/mscofield0/vin"
 repository = "https://github.com/mscofield0/vin"
-keywords = ["actor", "concurrency"]
+keywords = ["concurrency"]
+license-file = "../../LICENSE"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
