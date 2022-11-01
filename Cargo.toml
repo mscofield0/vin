@@ -2,7 +2,7 @@
 name = "vin"
 version = "2.0.0"
 edition = "2021"
-categories = ["actor", "concurrency"]
+categories = ["concurrency"]
 description = "An ergonomic actor framework"
 homepage = "https://github.com/mscofield0/vin"
 keywords = ["actor", "concurrency"]
