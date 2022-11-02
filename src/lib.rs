@@ -58,7 +58,7 @@
 //! ```
 
 pub use vin_core::{
-    self, query_actor, query_actor_erased, send, send_erased, send_to, shutdown,
+    self, query_actor, query_actor_erased, send, send_erased, send_to, shutdown, shutdown_future,
     wait_for_shutdowns, Actor, ActorId, ActorQueryError, Addr, Handler, LifecycleHook, Message, BoxedMessage,
     StartError, State, StrongAddr, StrongErasedAddr, WeakAddr, WeakErasedAddr,
 };

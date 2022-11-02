@@ -10,7 +10,7 @@
 use async_trait::async_trait;
 use lazy_static::lazy_static;
 use downcast_rs::{Downcast, DowncastSync};
-use tokio::sync::Notify;
+use tokio::sync::{Notify, futures::Notified};
 use std::{
     sync::atomic::{AtomicUsize, Ordering::*}, 
     time::Duration, 
@@ -286,6 +286,34 @@ pub async fn query_actor_erased<Id: AsRef<str>>(id: Id) -> Result<StrongErasedAd
 /// Sends a shutdown signal to all actors.
 pub fn shutdown() {
     SHUTDOWN_SIGNAL.notify_waiters();
+}
+
+/// Registers a shutdown future.
+/// 
+/// Useful in loops aside from the main actor loops to cancel activities.
+/// 
+/// # Example
+/// Just as an 
+/// 
+/// ```ignore
+/// let shutdown = vin::shutdown_future();
+/// tokio::pin!(shutdown);
+/// 
+/// loop {
+///     tokio::select! {
+///         msg = tcp_stream.read() => {
+///             ...
+///         },
+///         ...
+///         _ = &mut shutdown => {
+///             info!("Received shutdown signal.");
+///             break;
+///         },
+///     }
+/// }
+/// ```
+pub fn shutdown_future<'a>() -> Notified<'a> {
+    SHUTDOWN_SIGNAL.notified()
 }
 
 /// Registers an actor in the actor counter.

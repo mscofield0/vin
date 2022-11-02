@@ -98,9 +98,9 @@ pub fn handles(_args: TokenStream, _input: TokenStream) -> TokenStream {
 /// and 'silent' (silently discards the message).
 /// 
 /// ## Example
-/// ```rust
+/// ```ignore
 /// #[vin::actor]
-/// #[vin::handles(Message, bounded(size = 1024, report))]
+/// #[vin::handles(MyMsg, bounded(size = 1024, report))]
 /// struct MyActor;
 /// ```
 #[proc_macro_attribute]
