@@ -1,6 +1,6 @@
 [package]
 name = "vin"
-version = "2.1.2"
+version = "2.1.5"
 edition = "2021"
 categories = ["concurrency"]
 description = "An ergonomic actor framework"

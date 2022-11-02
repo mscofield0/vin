@@ -274,7 +274,7 @@ fn form_vin_hidden_struct(name: &Ident, handles_attrs: &Vec<HandlesAttribute>) -
     };
 
     let mut erased_tx_stream = TokenStream2::new();
-    erased_tx_stream.extend(quote! { struct #tx_wrapper_name<T: Message>(::vin::async_channel::Sender<T>); });
+    erased_tx_stream.extend(quote! { struct #tx_wrapper_name<T: ::vin::Message>(::vin::async_channel::Sender<T>); });
     handles_attrs.iter()
         .map(|attr| {
             let type_path = &attr.message_type.path;

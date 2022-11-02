@@ -293,7 +293,7 @@ pub fn shutdown() {
 /// Useful in loops aside from the main actor loops to cancel activities.
 /// 
 /// # Example
-/// Just as an 
+/// Pseudo Rust code to get the point across.
 /// 
 /// ```ignore
 /// let shutdown = vin::shutdown_future();
