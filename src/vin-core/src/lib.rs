@@ -178,6 +178,10 @@ pub async fn send_erased<M: Message>(addr: StrongErasedAddr, msg: M) {
 /// ```
 #[async_trait]
 pub trait LifecycleHook {
+    async fn on_run(&self) {
+        let fut = futures::future::pending();
+        let () = fut.await;
+    }
     async fn on_started(&self) {}
     async fn on_closed(&self) {}
 }

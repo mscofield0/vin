@@ -127,10 +127,6 @@ pub fn actor(_args: TokenStream, input: TokenStream) -> TokenStream {
         Err(err) => return err.to_compile_error().into(),
     };
 
-    if handles_attrs.is_empty() {
-        return Error::new(name.span(), "no message specified for handling").to_compile_error().into();
-    }
-
     // Derives on the actor struct
     let derives = input.attrs.iter()
         .filter(|attr| attr.path.is_ident("derive"))
@@ -423,7 +419,7 @@ fn form_actor_trait(
                 ::vin::tokio::spawn(async move {
                     use ::core::borrow::Borrow;
 
-                    let mut handler_join_set = ::vin::tokio::task::JoinSet::new();
+                    let mut handler_join_set = ::vin::tokio::task::JoinSet::<Result<(), ::vin::vin_core::HandlerError>>::new();
                     let shutdown = ::vin::vin_core::SHUTDOWN_SIGNAL.notified();
                     let close = actor.vin_hidden.close.notified();
                     ::vin::tokio::pin!(shutdown);
@@ -457,6 +453,7 @@ fn form_actor_trait(
                                 actor.vin_hidden.state.store(::vin::State::Closing);
                                 break;
                             },
+                            _ = <Self as ::vin::LifecycleHook>::on_run(actor.borrow()) => continue,
                             Some(res) = handler_join_set.join_next() => match res {
                                 Ok(handler_res) => if let Err(err) = handler_res {
                                     ::vin::tracing::error!("actor '{}' handling of '{}' failed with error: {:#?}", id, err.msg_name(), err);
