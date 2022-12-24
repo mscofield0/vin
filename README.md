@@ -17,14 +17,14 @@ vin = "3.0"
 
 ## Overview
 
-Vin's goal is to be an ergonomic, unconventional actor library. Vin doesn't follow the conventional implementations for actor libraries, but tries to be as simple as possible, while still providing an ergonomic and rich interface by integrating itself with [`tokio`] as much as possible. Each actor gets its own task to poll messages and execute handlers on. Its address is shared by a simple `Arc`. Vin also provides a way to gracefully shutdown all actors without having to do the manual labour yourself. Actor data is stored in its actor context and is retrievable for reading with `Actor::ctx()` and for writing with `Actor::ctx_mut()` which acquire a `RwLock` to the data. Vin also provides a "task actor" which is simply a [`tokio`] task spun up and synchronized with Vin's shutdown system.
+Vin's goal is to be an ergonomic, unconventional actor library. Vin doesn't follow the conventional implementations for actor libraries, but tries to be as simple as possible, while still providing an ergonomic and rich interface by integrating itself with [`tokio`](https://github.com/tokio-rs/tokio) as much as possible. Each actor gets its own task to poll messages and execute handlers on. Its address is shared by a simple `Arc`. Vin also provides a way to gracefully shutdown all actors without having to do the manual labour yourself. Actor data is stored in its actor context and is retrievable for reading with `Actor::ctx()` and for writing with `Actor::ctx_mut()` which acquire a `RwLock` to the data. Vin also provides a "task actor" which is simply a [`tokio`](https://github.com/tokio-rs/tokio) task spun up and synchronized with Vin's shutdown system.
 
 Vin completely relies on [`tokio`](https://github.com/tokio-rs/tokio) (for the async runtime), [`tracing`](https://github.com/tokio-rs/tracing) (for diagnostics), [`async_trait`](https://github.com/dtolnay/async-trait) and [`anyhow`](https://github.com/dtolnay/anyhow) (as the handler error type).
 
 ## Examples
 
 ### Regular actors
-Basic usage of [`vin`].
+Basic usage of [`vin`](https://github.com/mscofield0/vin).
 
 ```rust
 use std::time::Duration;
@@ -73,7 +73,7 @@ async fn main() {
 ```
 
 ### Task actors
-Basic usage of task actors in [`vin`].
+Basic usage of task actors in [`vin`](https://github.com/mscofield0/vin).
 
 ```rust
 use std::time::Duration;
