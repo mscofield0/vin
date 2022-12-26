@@ -31,13 +31,17 @@ fn form_task_actor_trait(
     quote! {
         #[::vin::vin_core::async_trait::async_trait]
         impl #impl_generics ::vin::vin_core::TaskActor for #name #ty_generics #where_clause {
-            async fn start<Id: Into<::vin::ActorId> + Send>(mut self, id: Id) {
+            async fn start<Id: Into<::vin::ActorId> + Send>(mut self, id: Id) -> ::std::sync::Arc<::vin::vin_core::TaskCloseHandle> {
                 ::vin::vin_core::add_actor();
                 let id = id.into();
+                let close_handle = ::std::sync::Arc::new(TaskCloseHandle::default());
+                let ret = close_handle.clone();
 
                 ::vin::tokio::spawn(async move {
                     let shutdown = ::vin::vin_core::SHUTDOWN_SIGNAL.notified();
+                    let close = close_handle.close_future();
                     ::vin::tokio::pin!(shutdown);
+                    ::vin::tokio::pin!(close);
 
                     ::vin::tracing::debug!("task actor '{}' started", id);
                     let mut task_join_set = ::vin::tokio::task::JoinSet::new();
@@ -47,6 +51,10 @@ fn form_task_actor_trait(
                         ::vin::tokio::select! {
                             _ = &mut shutdown => {
                                 ::vin::tracing::debug!("task actor '{}' received shutdown signal", id);
+                                break;
+                            },
+                            _ = &mut close => {
+                                ::vin::tracing::debug!("task actor '{}' received close signal", id);
                                 break;
                             },
                             Some(res) = task_join_set.join_next() => match res {
@@ -74,6 +82,8 @@ fn form_task_actor_trait(
 
                     ::vin::vin_core::remove_actor();
                 });
+
+                ret
             }
         }
     }

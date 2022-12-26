@@ -98,7 +98,7 @@
 
 pub use vin_core::{
     self, query_actor, query_actor_erased, send, send_erased, send_to, shutdown, shutdown_future,
-    wait_for_shutdowns, Actor, ActorId, Task, TaskActor, ActorQueryError, Addr, Handler, LifecycleHook, 
+    wait_for_shutdowns, Actor, ActorId, Task, TaskActor, TaskCloseHandle, ActorQueryError, Addr, Handler, LifecycleHook, 
     Message, BoxedMessage, StartError, State, StrongAddr, StrongErasedAddr, WeakAddr, WeakErasedAddr,
 };
 pub use vin_macros::{actor, handles, task};

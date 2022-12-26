@@ -29,8 +29,9 @@ mod tests {
             .with_max_level(Level::TRACE)
             .init();
 
-        MyTaskActor{ number: 5 }.start("test_task").await;
+        let close_handle = MyTaskActor{ number: 5 }.start("test_task").await;
         tokio::time::sleep(Duration::from_millis(100)).await;
+        close_handle.close();
         vin::shutdown();
         vin::wait_for_shutdowns().await;
     }

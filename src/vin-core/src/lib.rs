@@ -12,7 +12,7 @@ use lazy_static::lazy_static;
 use downcast_rs::{Downcast, DowncastSync};
 use tokio::sync::{Notify, futures::Notified};
 use std::{
-    sync::atomic::{AtomicUsize, Ordering::*}, 
+    sync::{atomic::{AtomicUsize, Ordering::*}, Arc}, 
     time::Duration, 
     fmt::Debug, 
     collections::HashMap,
@@ -182,11 +182,55 @@ pub trait LifecycleHook {
     async fn on_closed(&self) {}
 }
 
+/// A close handle with which to close a task actor.
+/// 
+/// # Usage
+/// 
+/// ```ignore
+/// let close_handle = TaskCloseHandle::default();
+/// let close = close_handle.close_future();
+/// tokio::pin!(close);
+/// 
+/// loop {
+///     tokio::select! {
+///         msg = tcp_stream.read() => {
+///             ...
+///         },
+///         ...
+///         _ = &mut close => {
+///             info!("Received close signal.");
+///             break;
+///         },
+///     }
+/// }
+/// ```
+pub struct TaskCloseHandle {
+    notifier: Notify,
+}
+
+impl TaskCloseHandle {
+    /// Registers a shutdown future.
+    pub fn close_future(&self) -> Notified {
+        self.notifier.notified()
+    }
+
+    /// Sends close signal to task.
+    pub fn close(&self) {
+        self.notifier.notify_waiters();
+    }
+}
+
+impl Default for TaskCloseHandle {
+    fn default() -> Self {
+        Self { notifier: Notify::const_new() }
+    }
+}
+
 /// Actor trait that all generic (non-specialized) actors must implement.
 #[async_trait]
 pub trait TaskActor: Task {
     /// Starts the task actor.
-    async fn start<Id: Into<ActorId> + Send>(self, id: Id)
+    async fn start<Id: Into<ActorId> + Send>(self, id: Id) -> Arc<TaskCloseHandle>
         where Self: Sized;
 }
 
