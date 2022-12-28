@@ -243,7 +243,7 @@ pub trait TaskActor: Task {
 #[async_trait]
 pub trait Task {
     /// Task function being executed.
-    async fn task(self) -> anyhow::Result<()>;
+    async fn task(mut self) -> anyhow::Result<()>;
 }
 
 /// Used in the attribute macro to implement an erased -> typed message sending.
