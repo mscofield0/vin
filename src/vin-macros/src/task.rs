@@ -35,7 +35,7 @@ fn form_task_actor_trait(
                 ::vin::vin_core::add_actor();
                 let id = id.into();
                 let close_handle = ::std::sync::Arc::new(TaskCloseHandle::default());
-                let ret = close_handle.clone();
+                let ret = ::std::sync::Arc::clone(&close_handle);
 
                 ::vin::tokio::spawn(async move {
                     let shutdown = ::vin::vin_core::SHUTDOWN_SIGNAL.notified();

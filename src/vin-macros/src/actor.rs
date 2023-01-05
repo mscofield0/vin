@@ -391,8 +391,8 @@ fn form_actor_trait(
                     reg.insert(id.clone(), ::std::sync::Arc::downgrade(&self) as ::vin::WeakErasedAddr);
                 }
 
-                let ret = self.clone();
-                let actor = self.clone();
+                let ret = ::vin::StrongAddr::clone(&self);
+                let actor = ::vin::StrongAddr::clone(&self);
                 ::vin::tokio::spawn(async move {
                     use ::core::borrow::Borrow;
 
@@ -412,7 +412,7 @@ fn form_actor_trait(
                                 let #msg_short_names = #msg_short_names.expect("channel should never be closed while the actor is running");
                                 ::vin::tracing::debug!("actor '{}' handling '{}'", id, stringify!(#msg_names));
 
-                                let self2 = actor.clone();
+                                let self2 = ::vin::StrongAddr::clone(&actor);
                                 handler_join_set.spawn(async move {
                                     match <Self as ::vin::Handler<#msg_names>>::handle(self2.borrow(), #msg_short_names).await {
                                         Ok(_) => Ok(()),
