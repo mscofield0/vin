@@ -1,9 +1,12 @@
 mod actor;
 mod task;
+mod message;
 use actor::actor_impl;
+use task::task_impl;
+use message::message_impl;
+
 use proc_macro::TokenStream;
 use quote::quote;
-use task::task_impl;
 
 /// Generates the actor impls and forms necessary fields.
 /// 
@@ -67,4 +70,30 @@ pub fn handles(_args: TokenStream, _input: TokenStream) -> TokenStream {
 #[proc_macro_attribute]
 pub fn task(args: TokenStream, input: TokenStream) -> TokenStream {
     task_impl(args, input)
+}
+
+/// Implements the [`Message`] trait for a type. Enables specifying the result type easily.
+/// 
+/// Shorthand for:
+/// ```ignore
+/// struct MyMsg;
+/// 
+/// impl Message for MyMsg {
+///     type Result = u32;
+/// }
+/// ```
+/// 
+/// # Example
+/// ```ignore
+/// #[vin::message] // No result type (result = ())
+/// struct MyMsg;
+/// ```
+/// or
+/// ```ignore
+/// #[vin::message(result = u32)]
+/// struct MyMsg;
+/// ```
+#[proc_macro_attribute]
+pub fn message(args: TokenStream, input: TokenStream) -> TokenStream {
+    message_impl(args, input)
 }

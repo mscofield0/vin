@@ -29,42 +29,42 @@ fn form_task_actor_trait(
     where_clause: Option<&WhereClause>,
 ) -> TokenStream2 {
     quote! {
-        #[::vin::vin_core::async_trait::async_trait]
+        #[::vin::async_trait::async_trait]
         impl #impl_generics ::vin::vin_core::TaskActor for #name #ty_generics #where_clause {
-            async fn start<Id: Into<::vin::ActorId> + Send>(mut self, id: Id) -> ::std::sync::Arc<::vin::vin_core::TaskCloseHandle> {
+            async fn start<Id: Into<::vin::vin_core::ActorId> + Send>(mut self, id: Id) -> ::std::sync::Arc<::vin::vin_core::TaskCloseHandle> {
                 ::vin::vin_core::add_actor();
                 let id = id.into();
-                let close_handle = ::std::sync::Arc::new(TaskCloseHandle::default());
-                let ret = ::std::sync::Arc::clone(&close_handle);
+                let ret = ::std::sync::Arc::new(TaskCloseHandle::default());
+                let close_handle = ::std::sync::Arc::clone(&ret);
 
                 ::vin::tokio::spawn(async move {
-                    let shutdown = ::vin::vin_core::SHUTDOWN_SIGNAL.notified();
+                    let shutdown = ::vin::vin_core::detail::SHUTDOWN_SIGNAL.notified();
                     let close = close_handle.close_future();
                     ::vin::tokio::pin!(shutdown);
                     ::vin::tokio::pin!(close);
 
-                    ::vin::tracing::debug!("task actor '{}' started", id);
+                    ::vin::log::debug!("vin | task actor '{}' started", id);
                     let mut task_join_set = ::vin::tokio::task::JoinSet::new();
                     task_join_set.spawn(<Self as ::vin::vin_core::Task>::task(self));
 
                     loop {
                         ::vin::tokio::select! {
                             _ = &mut shutdown => {
-                                ::vin::tracing::debug!("task actor '{}' received shutdown signal", id);
+                                ::vin::log::debug!("vin | task actor '{}' received shutdown signal", id);
                                 break;
                             },
                             _ = &mut close => {
-                                ::vin::tracing::debug!("task actor '{}' received close signal", id);
+                                ::vin::log::debug!("vin | task actor '{}' received close signal", id);
                                 break;
                             },
                             Some(res) = task_join_set.join_next() => match res {
                                 Ok(task_res) => match task_res {
                                     Ok(_) => {
-                                        ::vin::tracing::debug!("task actor '{}' completed gracefully", id);
+                                        ::vin::log::debug!("vin | task actor '{}' completed gracefully", id);
                                         break;
                                     },
                                     Err(err) => {
-                                        ::vin::tracing::error!("task actor '{}' failed with error: {:#?}", id, err);
+                                        ::vin::log::error!("vin | task actor '{}' failed with error: {:#?}", id, err);
                                         break;
                                     }
                                 },

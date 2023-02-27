@@ -1,5 +1,6 @@
 use vin::*;
 
+#[vin::message]
 #[derive(Debug, Clone)]
 pub enum Msg {
     Foo,
@@ -36,7 +37,7 @@ mod tests {
             .init();
 
         let ctx = VinContextMyActor;
-        let actor = MyActor::new("test", ctx).start().await.unwrap();
+        let actor = MyActor::start("test", ctx).await.unwrap();
         tokio::join!(
             actor.send(Msg::Bar),
             actor.send(Msg::Baz),

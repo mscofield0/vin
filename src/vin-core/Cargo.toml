@@ -1,6 +1,6 @@
 [package]
 name = "vin-core"
-version = "2.1.1"
+version = "3.0.0"
 edition = "2021"
 categories = ["concurrency"]
 description = "Core types and traits for vin"
@@ -18,7 +18,7 @@ anyhow = "1.0"
 thiserror = "1.0"
 lazy_static = "1.4"
 downcast-rs = "1.2"
-tracing = "0.1"
+log = "0.4"
 futures = "0.3"
 crossbeam = "0.8"
 async-channel = "1.7"

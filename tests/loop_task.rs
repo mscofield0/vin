@@ -10,7 +10,7 @@ struct MyTaskActor {
 impl vin::Task for MyTaskActor {
     async fn task(self) -> anyhow::Result<()> {
         for i in 0..self.number {
-            tracing::info!("{}. iteration", i);
+            log::info!("{}. iteration", i);
         }
 
         Err(anyhow::anyhow!("hi, i am error"))

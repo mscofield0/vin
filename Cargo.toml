@@ -1,6 +1,6 @@
 [package]
 name = "vin"
-version = "3.1.1"
+version = "4.0.0"
 edition = "2021"
 categories = ["concurrency"]
 description = "An ergonomic actor framework"
@@ -13,10 +13,12 @@ repository = "https://github.com/mscofield0/vin"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-vin-core = { path = "src/vin-core", version = "2.1" }
-vin-macros = { path = "src/vin-macros", version = "2.1" }
+vin-core = { path = "src/vin-core", version = "3.0" }
+vin-macros = { path = "src/vin-macros", version = "3.0" }
 
 [dev-dependencies]
+tracing = "0.1"
+tracing-log = "0.1"
 tracing-subscriber = "0.3"
 
 [workspace]
