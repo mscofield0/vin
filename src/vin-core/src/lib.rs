@@ -20,8 +20,7 @@ use std::{
 use tokio::sync::{
     RwLockReadGuard, 
     RwLockWriteGuard, 
-    futures::Notified, 
-    Notify
+    futures::Notified,
 };
 
 /// Actor lifecycle states.
@@ -82,16 +81,16 @@ pub trait Addr: DowncastSync + Sync {
     fn close(&self);
 
     /// Returns the id of the actor.
-    fn id(&self) -> &str;
+    fn id(&self) -> String;
 
     /// Checks if the actor has been started.
     fn is_started(&self) -> bool {
-        self.state() == State::Pending
+        self.state() != State::Pending && self.state() != State::Closed
     }
 
-    /// Checks if the actor is being or is closed.
+    /// Checks if the actor is closed.
     fn is_closed(&self) -> bool {
-        self.state() == State::Closing || self.state() == State::Closed
+        self.state() == State::Closed
     }
 }
 downcast_rs::impl_downcast!(sync Addr);
@@ -273,70 +272,40 @@ pub trait LifecycleHook {
     async fn on_closed(&self) {}
 }
 
-/// A close handle with which to close a task actor.
-/// 
-/// # Usage
-/// 
-/// ```ignore
-/// let close_handle = TaskCloseHandle::default();
-/// let close = close_handle.close_future();
-/// tokio::pin!(close);
-/// 
-/// loop {
-///     tokio::select! {
-///         msg = tcp_stream.read() => {
-///             ...
-///         },
-///         ...
-///         _ = &mut close => {
-///             info!("Received close signal.");
-///             break;
-///         },
-///     }
-/// }
-/// ```
-pub struct TaskCloseHandle {
-    notifier: Notify,
-}
-
-impl TaskCloseHandle {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Registers a close future.
-    pub fn close_future(&self) -> Notified {
-        self.notifier.notified()
-    }
-
-    /// Sends close signal to task.
-    pub fn close(&self) {
-        self.notifier.notify_waiters();
-    }
-}
-
-impl Default for TaskCloseHandle {
-    fn default() -> Self {
-        Self { notifier: Notify::const_new() }
-    }
-}
-
 /// Actor trait that all generic (non-specialized) actors must implement.
 #[async_trait]
-pub trait TaskActor: Task {
-    /// Starts the task actor.
-    async fn start<Id: Into<ActorId> + Send>(self, id: Id) -> std::sync::Arc<TaskCloseHandle>
-        where Self: Sized;
+pub trait TaskActor: Task + TaskAddr {
+    /// Creates and starts a task actor with the given id (if available) and context.
+    async fn start<Id: Into<ActorId> + Send>(id: Id, ctx: Self::Context) -> StrongAddr<Self>;
+}
+
+/// A restricted interface of `TaskActor` that provides closing and state reads.
+pub trait TaskAddr {
+    /// Sends a close signal to the task actor.
+    fn close(&self);
+
+    /// Returns the state of the task actor.
+    fn state(&self) -> State;
+
+    /// Returns the id of the task actor.
+    fn id(&self) -> String;
+
+    /// Returns if the task actor is closed.
+    fn is_closed(&self) -> bool {
+        self.state() == State::Closed
+    }
 }
 
 /// Used to call arbitrary code on a task actor.
-/// 
-/// # Note
-/// Unlike normal [`vin`] actors, a task actor does not provide a way to hook into its lifetime 
-/// with `on_started()` and `on_closed()` methods. This is because I can't find a good way to 
-/// supply the task future with a `&mut self`. If anyone figures out how to do it, submit a PR.
 #[async_trait]
-pub trait Task {
+pub trait Task: TaskContextTrait {
     /// Task function being executed.
-    async fn task(mut self) -> anyhow::Result<()>;
+    async fn task(&self, ctx: Self::Context) -> anyhow::Result<()>;
+}
+
+/// Private trait used by [`Task`] implementations to have access 
+/// to the context associated type.
+pub trait TaskContextTrait {
+    /// The task's context type.
+    type Context;
 }

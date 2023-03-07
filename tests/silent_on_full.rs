@@ -8,7 +8,7 @@ pub enum Msg {
     Baz,
 }
 
-#[vin::actor]
+#[vin::actor(no_awaiting)]
 #[vin::handles(Msg, bounded(size = 2, silent))]
 struct MyActor;
 

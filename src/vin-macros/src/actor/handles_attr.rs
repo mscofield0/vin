@@ -1,9 +1,5 @@
-use itertools::Itertools;
-use proc_macro::TokenStream;
-use proc_macro2::TokenStream as TokenStream2;
 use rassert_rs::rassert;
-use syn::{parse_macro_input, Ident, DeriveInput, parse::Parse, Error, LitInt, TypePath, Token, Data, Fields, parenthesized, ImplGenerics, TypeGenerics, WhereClause, Attribute, PathSegment};
-use quote::quote;
+use syn::{Ident, parse::Parse, Error, LitInt, TypePath, Token, parenthesized};
 
 pub struct HandlesAttribute {
     pub message_type: TypePath,

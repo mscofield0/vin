@@ -4,8 +4,10 @@ use syn::{Ident, ImplGenerics, TypeGenerics, WhereClause};
 
 use crate::actor::names::*;
 use crate::actor::handles_attr::*;
+use crate::actor::closing_attr::*;
 
 pub fn form_actor_trait(
+    closing_strategy: ClosingStrategy,
     name: &Ident,
     handles_attrs: &Vec<HandlesAttribute>,
     impl_generics: &ImplGenerics,
@@ -15,6 +17,36 @@ pub fn form_actor_trait(
     let (msg_names, msg_short_names) = form_message_names(&handles_attrs);
     let context_name = form_context_struct_name(name);
     let hidden_name = form_hidden_struct_name(name);
+
+    let closing_strategy = match closing_strategy {
+        ClosingStrategy::Awaiting => quote! {
+            use ::core::time::Duration;
+            let _ = ::vin::tokio::time::timeout(Duration::from_secs(1), async {
+                while let Some(res) = handler_join_set.join_next().await {
+                    match res {
+                        Ok(handler_res) => if let Err(err) = handler_res {
+                            ::vin::log::error!("vin | actor '{}' handling of '{}' failed with error: {:#?}", id, err.msg_name(), err);
+                        },
+                        Err(join_err) => if let Ok(reason) = join_err.try_into_panic() {
+                            ::std::panic::resume_unwind(reason);
+                        },
+                    }
+                }
+            }).await;
+        },
+        ClosingStrategy::NoAwaiting => quote! {
+            while let Some(res) = handler_join_set.join_next().await {
+                match res {
+                    Ok(handler_res) => if let Err(err) = handler_res {
+                        ::vin::log::error!("vin | actor '{}' handling of '{}' failed with error: {:#?}", id, err.msg_name(), err);
+                    },
+                    Err(join_err) => if let Ok(reason) = join_err.try_into_panic() {
+                        ::std::panic::resume_unwind(reason);
+                    },
+                }
+            }
+        },
+    };
 
     quote! {
         #[::vin::async_trait::async_trait]
@@ -29,7 +61,7 @@ pub fn form_actor_trait(
                 self.vin_ctx.write().await
             }
 
-            async fn start<Id: Into<ActorId> + Send>(id: Id, ctx: Self::Context) -> ::vin::anyhow::Result<::vin::vin_core::StrongAddr<Self>> {
+            async fn start<Id: Into<::vin::vin_core::ActorId> + Send>(id: Id, ctx: Self::Context) -> ::vin::anyhow::Result<::vin::vin_core::StrongAddr<Self>> {
                 let id = id.into();
 
                 // Add actor to global registry
@@ -69,12 +101,10 @@ pub fn form_actor_trait(
                         ::vin::tokio::select! {
                             _ = &mut close => {
                                 ::vin::log::debug!("vin | actor '{}' received close signal", id);
-                                actor.vin_hidden.state.store(::vin::vin_core::State::Closing);
                                 break;
                             },
                             _ = &mut shutdown => {
                                 ::vin::log::debug!("vin | actor '{}' received shutdown signal", id);
-                                actor.vin_hidden.state.store(::vin::vin_core::State::Closing);
                                 break;
                             },
                             Some(res) = handler_join_set.join_next() => match res {
@@ -107,20 +137,11 @@ pub fn form_actor_trait(
                     }
 
                     // Give some time for the existing handlers to gracefully end
+                    actor.vin_hidden.state.store(::vin::vin_core::State::Closing);
                     ::vin::log::debug!("vin | actor '{}' is closing...", id);
-                    use ::core::time::Duration;
-                    let _ = ::vin::tokio::time::timeout(Duration::from_secs(1), async {
-                        while let Some(res) = handler_join_set.join_next().await {
-                            match res {
-                                Ok(handler_res) => if let Err(err) = handler_res {
-                                    ::vin::log::error!("vin | actor '{}' handling of '{}' failed with error: {:#?}", id, err.msg_name(), err);
-                                },
-                                Err(join_err) => if let Ok(reason) = join_err.try_into_panic() {
-                                    ::std::panic::resume_unwind(reason);
-                                },
-                            }
-                        }
-                    }).await;
+
+                    // Either await until completion or just wait for 1 more second and then close
+                    #closing_strategy
 
                     // After aborting, the join set still needs to be drained since tasks only get cancelled
                     // on an 'await' point
@@ -186,7 +207,6 @@ pub fn form_actor_trait(
             }
 
             fn close(&self) {
-                self.vin_hidden.state.store(::vin::vin_core::State::Closing);
                 self.vin_hidden.close.notify_waiters();
             }
 
@@ -194,8 +214,8 @@ pub fn form_actor_trait(
                 self.vin_hidden.state.load()
             }
 
-            fn id(&self) -> &str {
-                &self.vin_hidden.id
+            fn id(&self) -> String {
+                self.vin_hidden.id.to_string()
             }
         }
     }

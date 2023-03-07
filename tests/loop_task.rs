@@ -8,8 +8,8 @@ struct MyTaskActor {
 
 #[async_trait]
 impl vin::Task for MyTaskActor {
-    async fn task(self) -> anyhow::Result<()> {
-        for i in 0..self.number {
+    async fn task(&self, ctx: Self::Context) -> anyhow::Result<()> {
+        for i in 0..ctx.number {
             log::info!("{}. iteration", i);
         }
 
@@ -29,10 +29,14 @@ mod tests {
             .with_max_level(Level::TRACE)
             .init();
 
-        let close_handle = MyTaskActor{ number: 5 }.start("test_task").await;
+        let ctx = VinContextMyTaskActor {
+            number: 5,
+        };
+        let actor = MyTaskActor::start("test_task", ctx).await;
         tokio::time::sleep(Duration::from_millis(100)).await;
-        close_handle.close();
-        vin::shutdown();
+        actor.close();
         vin::wait_for_shutdowns().await;
+        assert_eq!(actor.state(), State::Closed);
+        assert_eq!(actor.is_closed(), true);
     }
 }

@@ -143,7 +143,7 @@ pub fn form_vin_hidden_struct(
 
         struct #hidden_struct_name {
             mailbox: #mailbox_struct_name,
-            state: ::vin::crossbeam::atomic::AtomicCell<::vin::State>,
+            state: ::vin::crossbeam::atomic::AtomicCell<::vin::vin_core::State>,
             close: ::vin::tokio::sync::Notify,
             id: ::vin::vin_core::ActorId,
         }

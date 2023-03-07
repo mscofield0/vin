@@ -1,10 +1,24 @@
+mod task_actor_impl;
+mod hidden_struct;
+mod context_struct;
+pub mod names;
+
+use task_actor_impl::*;
+use hidden_struct::*;
+use context_struct::*;
+use names::*;
+
 use proc_macro::TokenStream;
-use proc_macro2::{TokenStream as TokenStream2};
-use syn::{parse_macro_input, Ident, DeriveInput, ImplGenerics, TypeGenerics, WhereClause};
+use syn::{parse_macro_input, DeriveInput, Data, Error};
 use quote::{quote};
 
 pub fn task_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as DeriveInput);
+    let mut input = parse_macro_input!(input as DeriveInput);
+    
+    let data = match input.data {
+        Data::Struct(ref mut data) => data,
+        _ => return Error::new(input.ident.span(), "vin only works on structs").into_compile_error().into(),
+    };
     
     // Common vars for building the final output
     let name = &input.ident;
@@ -13,78 +27,34 @@ pub fn task_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
     // Actor trait impl
     let actor_trait = form_task_actor_trait(name, &impl_generics, &ty_generics, where_clause);
 
+    // Other attributes on the actor struct
+    let other_attrs = input.attrs.iter().collect::<Vec<_>>();
+
+    // All handled message names
+    let vin_hidden_struct = form_vin_hidden_struct(name);
+
+    // Thread-safe, wrapped actor context
+    let vin_context_struct = form_vin_context_struct(name, &data.fields, &other_attrs);
+    
+    // Modify struct fields
+    let hidden_struct_name = form_hidden_struct_name(name);
+    
+    // Remove all other attributes since it's likely not what the user wanted (they are reapplied onto the context struct)
+    input.attrs.clear();
+    let attrs = &input.attrs;
+
     let bruh = quote! {
-        #input
+        #(#attrs)*
+        pub struct #name {
+            vin_hidden: #hidden_struct_name,
+        }
+
+        #vin_context_struct
+
+        #vin_hidden_struct
 
         #actor_trait
     }.into();
 
     bruh
-}
-
-fn form_task_actor_trait(
-    name: &Ident,
-    impl_generics: &ImplGenerics,
-    ty_generics: &TypeGenerics,
-    where_clause: Option<&WhereClause>,
-) -> TokenStream2 {
-    quote! {
-        #[::vin::async_trait::async_trait]
-        impl #impl_generics ::vin::vin_core::TaskActor for #name #ty_generics #where_clause {
-            async fn start<Id: Into<::vin::vin_core::ActorId> + Send>(mut self, id: Id) -> ::std::sync::Arc<::vin::vin_core::TaskCloseHandle> {
-                ::vin::vin_core::add_actor();
-                let id = id.into();
-                let ret = ::std::sync::Arc::new(TaskCloseHandle::default());
-                let close_handle = ::std::sync::Arc::clone(&ret);
-
-                ::vin::tokio::spawn(async move {
-                    let shutdown = ::vin::vin_core::detail::SHUTDOWN_SIGNAL.notified();
-                    let close = close_handle.close_future();
-                    ::vin::tokio::pin!(shutdown);
-                    ::vin::tokio::pin!(close);
-
-                    ::vin::log::debug!("vin | task actor '{}' started", id);
-                    let mut task_join_set = ::vin::tokio::task::JoinSet::new();
-                    task_join_set.spawn(<Self as ::vin::vin_core::Task>::task(self));
-
-                    loop {
-                        ::vin::tokio::select! {
-                            _ = &mut shutdown => {
-                                ::vin::log::debug!("vin | task actor '{}' received shutdown signal", id);
-                                break;
-                            },
-                            _ = &mut close => {
-                                ::vin::log::debug!("vin | task actor '{}' received close signal", id);
-                                break;
-                            },
-                            Some(res) = task_join_set.join_next() => match res {
-                                Ok(task_res) => match task_res {
-                                    Ok(_) => {
-                                        ::vin::log::debug!("vin | task actor '{}' completed gracefully", id);
-                                        break;
-                                    },
-                                    Err(err) => {
-                                        ::vin::log::error!("vin | task actor '{}' failed with error: {:#?}", id, err);
-                                        break;
-                                    }
-                                },
-                                Err(join_err) => if let Ok(reason) = join_err.try_into_panic() {
-                                    ::std::panic::resume_unwind(reason);
-                                },
-                            },
-                        };
-                    }
-
-                    // After aborting, the join set still needs to be drained since tasks only get cancelled
-                    // on an 'await' point
-                    task_join_set.abort_all();
-                    while task_join_set.join_next().await.is_some() {}
-
-                    ::vin::vin_core::remove_actor();
-                });
-
-                ret
-            }
-        }
-    }
 }

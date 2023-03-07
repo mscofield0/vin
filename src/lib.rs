@@ -88,8 +88,8 @@
 
 //! #[async_trait]
 //! impl vin::Task for MyTaskActor {
-//!     async fn task(self) -> anyhow::Result<()> {
-//!         for i in 0..self.number {
+//!     async fn task(&self, ctx: Self::Context) -> anyhow::Result<()> {
+//!         for i in 0..ctx.number {
 //!             log::info!("{}. iteration", i);
 //!         }
 //! 
@@ -103,8 +103,10 @@
 //!         .with_max_level(Level::TRACE)
 //!         .init();
 //! 
-//!     MyTaskActor{ number: 5 }.start("test_task").await;
+//! 	let ctx = VinContextMyTaskActor { number: 5 };
+//!     let actor = MyTaskActor::start("test_task", ctx).await;
 //!     tokio::time::sleep(Duration::from_millis(100)).await;
+//! 	actor.close();
 //!     vin::shutdown();
 //!     vin::wait_for_shutdowns().await;
 //! }
@@ -115,7 +117,7 @@ pub use vin_core::{
 	StrongAddr, WeakAddr, StrongErasedAddr, WeakErasedAddr,
 	BoxedMessage, shutdown, shutdown_future, add_actor, remove_actor,
 	wait_for_shutdowns, ActorQueryError, query_actor, query_actor_erased,
-	send_at, erased_send_at, LifecycleHook, TaskCloseHandle, TaskActor, Task, 
+	send_at, erased_send_at, LifecycleHook, TaskActor, Task, TaskAddr,
 };
 pub use vin_macros::{actor, handles, task, message};
 

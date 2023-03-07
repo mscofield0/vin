@@ -1,6 +1,7 @@
 mod actor;
 mod task;
 mod message;
+
 use actor::actor_impl;
 use task::task_impl;
 use message::message_impl;
@@ -10,7 +11,15 @@ use quote::quote;
 
 /// Generates the actor impls and forms necessary fields.
 /// 
-/// ## Additional arguments
+/// # Arguments
+/// This proc macro supports the following arguments:
+/// - `awaiting` (default)
+/// - `no_awaiting`
+/// 
+/// # `vin::handles()` proc macro
+/// Specifies which message the actor handles, then generates code to handle the message.
+/// 
+/// ## Arguments
 /// Currently there is only one additional argument and it's 'bounded'.
 /// 
 /// ### `bounded`
@@ -19,10 +28,16 @@ use quote::quote;
 /// available strategies are: 'wait' (awaits until the mailbox is available), 'report' (reports a failure) 
 /// and 'silent' (silently discards the message).
 /// 
-/// ## Example
+/// # Example
 /// ```ignore
-/// #[vin::actor]
+/// #[vin::actor] /* defaults to `awaiting` */
 /// #[vin::handles(MyMsg, bounded(size = 1024, report))]
+/// struct MyActor;
+/// 
+/// /* or */
+/// 
+/// #[vin::actor(no_awaiting)]
+/// #[vin::handles(MyMsg, bounded(size = 1024, wait))]
 /// struct MyActor;
 /// ```
 #[proc_macro_attribute]
@@ -57,12 +72,10 @@ pub fn handles(_args: TokenStream, _input: TokenStream) -> TokenStream {
 /// 
 /// #[async_trait]
 /// impl TaskActor for WebsocketSession {
-///     async fn task(&mut self) -> anyhow::Result<()> {
+///     async fn task(&self, ctx: Self::Context) -> anyhow::Result<()> {
 ///         loop {
-///             match self.ws.recv().await {
-///                 Ok(msg) => {}, // e.g. send the message to some other actor
-///                 Err(err) => return Err(err), // and maybe even notify some "manager" actor
-///             }
+///             let msg = self.ws.recv().await?;
+///             /* do something */
 ///         }
 ///     }
 /// }
