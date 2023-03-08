@@ -23,6 +23,7 @@ pub fn actor_impl(args: TokenStream, input: TokenStream) -> TokenStream {
     
     // Common vars for building the final output
     let name = &input.ident;
+    let generics = &input.generics;
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
  
 	let closing_strategy = match syn::parse::<ClosingStrategy>(args) {
@@ -50,13 +51,13 @@ pub fn actor_impl(args: TokenStream, input: TokenStream) -> TokenStream {
     let vin_hidden_struct = form_vin_hidden_struct(name, &handles_attrs);
 
     // Thread-safe, wrapped actor context
-    let vin_context_struct = form_vin_context_struct(name, &data.fields, &other_attrs);
+    let vin_context_struct = form_vin_context_struct(name, &data.fields, &other_attrs, &generics);
 
     // Forwarder trait impls
     let forwarder_traits = form_forwarder_impls(name, &handles_attrs, &impl_generics, &ty_generics, where_clause);
 
     // Actor trait impl
-    let actor_trait = form_actor_trait(closing_strategy, name, &handles_attrs, &impl_generics, &ty_generics, where_clause);
+    let actor_trait = form_actor_trait(closing_strategy, name, &handles_attrs, &generics, &impl_generics, &ty_generics, where_clause);
 
     // Modify struct fields
     let hidden_struct_name = form_hidden_struct_name(name);
@@ -68,8 +69,8 @@ pub fn actor_impl(args: TokenStream, input: TokenStream) -> TokenStream {
 
     quote! {
         #(#attrs)*
-        pub struct #name {
-            vin_ctx: ::vin::tokio::sync::RwLock<#context_struct_name>,
+        pub struct #name #generics {
+            vin_ctx: ::vin::tokio::sync::RwLock<#context_struct_name #ty_generics>,
             vin_hidden: #hidden_struct_name,
         }
 

@@ -34,7 +34,7 @@ pub fn task_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
     let vin_hidden_struct = form_vin_hidden_struct(name);
 
     // Thread-safe, wrapped actor context
-    let vin_context_struct = form_vin_context_struct(name, &data.fields, &other_attrs);
+    let vin_context_struct = form_vin_context_struct(name, &data.fields, &other_attrs, &ty_generics, where_clause);
     
     // Modify struct fields
     let hidden_struct_name = form_hidden_struct_name(name);
@@ -45,7 +45,7 @@ pub fn task_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
 
     let bruh = quote! {
         #(#attrs)*
-        pub struct #name {
+        pub struct #name #ty_generics #where_clause {
             vin_hidden: #hidden_struct_name,
         }
 

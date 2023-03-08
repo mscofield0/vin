@@ -1,6 +1,6 @@
 use proc_macro2::TokenStream as TokenStream2;
 use quote::quote;
-use syn::{Ident, ImplGenerics, TypeGenerics, WhereClause};
+use syn::{Ident, Generics, ImplGenerics, TypeGenerics, WhereClause};
 
 use crate::actor::names::*;
 use crate::actor::handles_attr::*;
@@ -10,6 +10,7 @@ pub fn form_actor_trait(
     closing_strategy: ClosingStrategy,
     name: &Ident,
     handles_attrs: &Vec<HandlesAttribute>,
+    generics: &Generics,
     impl_generics: &ImplGenerics,
     ty_generics: &TypeGenerics,
     where_clause: Option<&WhereClause>,
@@ -51,7 +52,7 @@ pub fn form_actor_trait(
     quote! {
         #[::vin::async_trait::async_trait]
         impl #impl_generics ::vin::vin_core::Actor for #name #ty_generics #where_clause {
-            type Context = #context_name;
+            type Context = #context_name #ty_generics;
 
             async fn ctx(&self) -> ::vin::tokio::sync::RwLockReadGuard<Self::Context> {
                 self.vin_ctx.read().await
