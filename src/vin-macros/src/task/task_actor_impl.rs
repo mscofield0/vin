@@ -59,6 +59,7 @@ pub fn form_task_actor_trait(
                             },
                             _ = &mut shutdown => {
                                 ::vin::log::debug!("vin | task actor '{}' received shutdown signal", id);
+                                actor.vin_hidden.close.notify_waiters();
                                 break;
                             },
                             Some(res) = task_join_set.join_next() => match res {

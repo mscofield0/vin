@@ -106,6 +106,7 @@ pub fn form_actor_trait(
                             },
                             _ = &mut shutdown => {
                                 ::vin::log::debug!("vin | actor '{}' received shutdown signal", id);
+                                actor.vin_hidden.close.notify_waiters();
                                 break;
                             },
                             Some(res) = handler_join_set.join_next() => match res {
