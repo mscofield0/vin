@@ -106,6 +106,10 @@ pub fn form_task_actor_trait(
             fn close(&self) {
                 self.vin_hidden.close.notify_waiters();
             }
+
+            fn close_future(&self) -> ::vin::tokio::sync::futures::Notified<'_> {
+                self.vin_hidden.close.notified()
+            }
             
             fn state(&self) -> ::vin::vin_core::State {
                 self.vin_hidden.state.load()

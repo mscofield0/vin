@@ -79,6 +79,9 @@ pub trait Addr: DowncastSync + Sync {
     /// Closes the actor and gives the actor time to process the already-queued up 
     /// messages.
     fn close(&self);
+    
+    /// Returns this actor's close future.
+    fn close_future(&self) -> Notified<'_>;
 
     /// Returns the id of the actor.
     fn id(&self) -> String;
@@ -283,6 +286,9 @@ pub trait TaskActor: Task + TaskAddr {
 pub trait TaskAddr {
     /// Sends a close signal to the task actor.
     fn close(&self);
+    
+    /// Returns this task actor's close future.
+    fn close_future(&self) -> Notified<'_>;
 
     /// Returns the state of the task actor.
     fn state(&self) -> State;
