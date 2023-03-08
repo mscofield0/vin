@@ -20,6 +20,18 @@ pub fn form_actor_trait(
 
     let closing_strategy = match closing_strategy {
         ClosingStrategy::Awaiting => quote! {
+            while let Some(res) = handler_join_set.join_next().await {
+                match res {
+                    Ok(handler_res) => if let Err(err) = handler_res {
+                        ::vin::log::error!("vin | actor '{}' handling of '{}' failed with error: {:#?}", id, err.msg_name(), err);
+                    },
+                    Err(join_err) => if let Ok(reason) = join_err.try_into_panic() {
+                        ::std::panic::resume_unwind(reason);
+                    },
+                }
+            }
+        },
+        ClosingStrategy::NoAwaiting => quote! {
             use ::core::time::Duration;
             let _ = ::vin::tokio::time::timeout(Duration::from_secs(1), async {
                 while let Some(res) = handler_join_set.join_next().await {
@@ -33,18 +45,6 @@ pub fn form_actor_trait(
                     }
                 }
             }).await;
-        },
-        ClosingStrategy::NoAwaiting => quote! {
-            while let Some(res) = handler_join_set.join_next().await {
-                match res {
-                    Ok(handler_res) => if let Err(err) = handler_res {
-                        ::vin::log::error!("vin | actor '{}' handling of '{}' failed with error: {:#?}", id, err.msg_name(), err);
-                    },
-                    Err(join_err) => if let Ok(reason) = join_err.try_into_panic() {
-                        ::std::panic::resume_unwind(reason);
-                    },
-                }
-            }
         },
     };
 
