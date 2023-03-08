@@ -1,6 +1,6 @@
 [package]
 name = "vin-macros"
-version = "4.0.2"
+version = "4.0.3"
 description = "Procedural macros that power vin"
 edition = "2021"
 categories = ["concurrency"]

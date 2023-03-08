@@ -181,7 +181,7 @@ pub fn form_actor_trait(
                 <Self as ::vin::vin_core::detail::Forwarder<M>>::forward(&self, msg).await;
             }
 
-            async fn send_and_wait<M: Message>(&self, msg: M) -> ::vin::anyhow::Result<M::Result>
+            async fn send_and_wait<M: ::vin::vin_core::Message>(&self, msg: M) -> ::vin::anyhow::Result<M::Result>
                 where
                     Self: Sized + ::vin::vin_core::detail::Forwarder<M>,
                     M::Result: Send,

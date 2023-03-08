@@ -1,6 +1,8 @@
 use vin::*;
 use std::fmt::Debug;
 
+struct Message;
+
 #[vin::message]
 #[derive(Debug, Clone)]
 pub enum Msg {
