@@ -9,6 +9,7 @@ use crate::task::names::{
 
 pub fn form_task_actor_trait(
     name: &Ident,
+    phantom_field_names: &Vec<Ident>,
     impl_generics: &ImplGenerics,
     ty_generics: &TypeGenerics,
     where_clause: Option<&WhereClause>,
@@ -27,6 +28,7 @@ pub fn form_task_actor_trait(
                         id: id.clone(),
                         ..Default::default()
                     },
+                    #(#phantom_field_names: ::core::marker::PhantomData),*
                 });
                 let actor = ::std::sync::Arc::clone(&ret);
 
@@ -115,7 +117,7 @@ pub fn form_task_actor_trait(
         }
 
         impl #impl_generics ::vin::vin_core::TaskContextTrait for #name #ty_generics #where_clause {
-            type Context = #context_name;
+            type Context = #context_name #ty_generics;
         }
     }
 }

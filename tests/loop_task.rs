@@ -2,12 +2,13 @@ use vin::*;
 
 #[vin::task]
 #[derive(Debug, Clone, PartialEq, Eq)]
-struct MyTaskActor {
+struct MyTaskActor<T: Clone + Send + Sync + 'static> {
     pub number: u32,
+    _phantom: std::marker::PhantomData<T>,
 }
 
 #[async_trait]
-impl vin::Task for MyTaskActor {
+impl<T: Clone + Send + Sync + 'static> vin::Task for MyTaskActor<T> {
     async fn task(&self, ctx: Self::Context) -> anyhow::Result<()> {
         for i in 0..ctx.number {
             log::info!("{}. iteration", i);
@@ -29,8 +30,9 @@ mod tests {
             .with_max_level(Level::TRACE)
             .init();
 
-        let ctx = VinContextMyTaskActor {
+        let ctx = VinContextMyTaskActor::<u32> {
             number: 5,
+            _phantom: std::marker::PhantomData,
         };
         let actor = MyTaskActor::start("test_task", ctx).await;
         tokio::time::sleep(Duration::from_millis(100)).await;
