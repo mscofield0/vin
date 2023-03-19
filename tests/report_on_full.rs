@@ -15,7 +15,7 @@ struct MyActor {
 }
 
 #[async_trait]
-impl vin::LifecycleHook for MyActor {}
+impl vin::Hooks for MyActor {}
 
 #[async_trait]
 impl vin::Handler<Msg> for MyActor {

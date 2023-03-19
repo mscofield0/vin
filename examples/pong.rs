@@ -28,7 +28,7 @@ struct PingActor {
     time_of_ping: Option<Instant>,
 }
 
-impl vin::LifecycleHook for PingActor {}
+impl vin::Hooks for PingActor {}
 
 #[async_trait]
 impl vin::Handler<Ping> for PingActor {

@@ -12,7 +12,7 @@ A lightweight, ergonomic and unconventional actor crate.
 
 ```toml
 [dependencies]
-vin = "5.1"
+vin = "6.0"
 ```
 
 ## Overview
@@ -50,7 +50,7 @@ struct MyActor {
 }
 
 #[async_trait]
-impl vin::LifecycleHook for MyActor {}
+impl vin::Hooks for MyActor {}
 
 #[async_trait]
 impl vin::Handler<Msg> for MyActor {

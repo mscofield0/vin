@@ -263,16 +263,17 @@ pub async fn erased_send_at<Id: AsRef<str>>(actor_id: Id, msg: BoxedMessage<()>)
 /// struct MyActor;
 /// 
 /// #[async_trait]
-/// impl vin::LifecycleHook for MyActor {
+/// impl vin::Hooks for MyActor {
 ///     async fn on_started(&self) {
 ///         println!("Started!");
 ///     }
 /// }
 /// ```
 #[async_trait]
-pub trait LifecycleHook {
+pub trait Hooks {
     async fn on_started(&self) {}
     async fn on_closed(&self) {}
+    async fn on_error(&self, _err: anyhow::Error) {}
 }
 
 /// Actor trait that all generic (non-specialized) actors must implement.

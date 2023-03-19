@@ -29,7 +29,7 @@ impl<T: Debug + Clone + Send + Sync> vin::Handler<Msg> for MyActor<T> {
 }
 
 #[async_trait]
-impl<T: Debug + Clone + Send + Sync> vin::LifecycleHook for MyActor<T> {}
+impl<T: Debug + Clone + Send + Sync> vin::Hooks for MyActor<T> {}
 
 #[cfg(test)]
 mod tests {

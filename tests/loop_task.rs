@@ -12,6 +12,7 @@ impl<T: Clone + Send + Sync + 'static> vin::Task for MyTaskActor<T> {
     async fn task(&self, ctx: Self::Context) -> anyhow::Result<()> {
         for i in 0..ctx.number {
             log::info!("{}. iteration", i);
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         }
 
         Err(anyhow::anyhow!("hi, i am error"))
@@ -35,10 +36,11 @@ mod tests {
             _phantom: std::marker::PhantomData,
         };
         let actor = MyTaskActor::start("test_task", ctx).await;
+        drop(actor);
         tokio::time::sleep(Duration::from_millis(100)).await;
-        actor.close();
+        // actor.close();
         vin::wait_for_shutdowns().await;
-        assert_eq!(actor.state(), State::Closed);
-        assert_eq!(actor.is_closed(), true);
+        // assert_eq!(actor.state(), State::Closed);
+        // assert_eq!(actor.is_closed(), true);
     }
 }

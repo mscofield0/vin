@@ -2,28 +2,23 @@ use vin::*;
 
 #[vin::message]
 #[derive(Debug, Clone)]
-pub enum Msg {
-    Foo,
-    Bar,
-    Baz,
-}
+pub struct Msg;
 
 #[vin::actor]
-#[vin::handles(Msg, bounded(size = 1, wait))]
-struct MyActor {
-    pub number: u32,
-}
+#[vin::handles(Msg, bounded(size = 1024, wait))]
+struct MyActor;
 
 #[async_trait]
-impl vin::Hooks for MyActor {}
+impl vin::Hooks for MyActor {
+    async fn on_error(&self, err: anyhow::Error) {
+        log::error!("on_error says: {}", err);
+    }
+}
 
 #[async_trait]
 impl vin::Handler<Msg> for MyActor {
-    async fn handle(&self, msg: Msg) -> anyhow::Result<()> {
-        let ctx = self.ctx().await;
-        println!("The message is: {:?} and the number is {}", msg, ctx.number);
-
-        Ok(())
+    async fn handle(&self, _: Msg) -> anyhow::Result<()> {
+        Err(anyhow::anyhow!("hello world"))
     }
 }
 
@@ -39,14 +34,9 @@ mod tests {
             .with_max_level(Level::TRACE)
             .init();
 
-        let ctx = VinContextMyActor { number: 42 };
+        let ctx = VinContextMyActor;
         let actor = MyActor::start("test", ctx).await.unwrap();
-        tokio::join!(
-            actor.send(Msg::Bar),
-            actor.send(Msg::Baz),
-            actor.send(Msg::Foo),
-            actor.send(Msg::Bar),
-        );
+        actor.send(Msg).await;
         tokio::time::sleep(Duration::from_millis(100)).await;
         vin::shutdown();
         vin::wait_for_shutdowns().await;

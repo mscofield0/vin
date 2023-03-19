@@ -36,7 +36,7 @@
 //! }
 //! 
 //! #[async_trait]
-//! impl vin::LifecycleHook for MyActor {}
+//! impl vin::Hooks for MyActor {}
 //! 
 //! #[async_trait]
 //! impl vin::Handler<Msg> for MyActor {
@@ -117,7 +117,7 @@ pub use vin_core::{
 	StrongAddr, WeakAddr, StrongErasedAddr, WeakErasedAddr,
 	BoxedMessage, shutdown, shutdown_future, add_actor, remove_actor,
 	wait_for_shutdowns, ActorQueryError, query_actor, query_actor_erased,
-	send_at, erased_send_at, LifecycleHook, TaskActor, Task, TaskAddr,
+	send_at, erased_send_at, Hooks, TaskActor, Task, TaskAddr,
 };
 pub use vin_macros::{actor, handles, task, message};
 

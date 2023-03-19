@@ -97,7 +97,7 @@ pub fn form_actor_trait(
 
                     ::vin::log::debug!("vin | actor '{}' started", id);
                     actor.vin_hidden.state.store(::vin::vin_core::State::Running);
-                    <Self as ::vin::vin_core::LifecycleHook>::on_started(actor.borrow()).await;
+                    <Self as ::vin::vin_core::Hooks>::on_started(actor.borrow()).await;
                     loop {
                         ::vin::tokio::select! {
                             _ = &mut close => {
@@ -112,6 +112,11 @@ pub fn form_actor_trait(
                             Some(res) = handler_join_set.join_next() => match res {
                                 Ok(handler_res) => if let Err(err) = handler_res {
                                     ::vin::log::error!("vin | actor '{}' handling of '{}' failed with error: {:#?}", id, err.msg_name(), err);
+                                    let actor = ::std::sync::Arc::clone(&actor);
+                                    handler_join_set.spawn(async move {
+                                        <Self as ::vin::vin_core::Hooks>::on_error(actor.borrow(), err.inner).await;
+                                        Ok(())
+                                    });
                                 },
                                 Err(join_err) => if let Ok(reason) = join_err.try_into_panic() {
                                     ::std::panic::resume_unwind(reason);
@@ -151,7 +156,7 @@ pub fn form_actor_trait(
                     while handler_join_set.join_next().await.is_some() {}
 
                     // Run the lifecycle on_closed hook
-                    <Self as ::vin::vin_core::LifecycleHook>::on_closed(actor.borrow()).await;
+                    <Self as ::vin::vin_core::Hooks>::on_closed(actor.borrow()).await;
                     actor.vin_hidden.state.store(::vin::vin_core::State::Closed);
                     ::vin::log::debug!("vin | actor '{}' is closed", id);
 
