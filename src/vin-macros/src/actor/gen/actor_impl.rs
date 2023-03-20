@@ -49,6 +49,29 @@ pub fn form_actor_trait(
         },
     };
 
+    let (semaphore_inits, semaphore_names) = handles_attrs
+        .iter()
+        .zip(msg_short_names.iter())
+        .map(|(attr, short_name)| {
+            let name = quote::format_ident!("sem_{}", short_name);
+            match &attr.bounded {
+                Some(bounded) => {
+                    let size = bounded.size;
+                    (quote! { let #name = ::vin::tokio::sync::Arc::new(::vin::tokio::sync::Semaphore::new(#size)); }, quote! { name })
+                },
+                None => {
+                    (quote! { let #name = ::vin::tokio::sync::Arc::new(::vin::tokio::sync::Semaphore::new(100_000)); }, quote! { name })
+                }
+            }
+        })
+        .unzip();
+    let semaphore_uses = quote! {
+        ::vin::tokio::join!(
+            ::vin::tokio::sync::Arc::clone(&#semaphore_names).acquire_owned(), 
+            #msg_short_names = actor.vin_hidden.mailbox.#msg_short_names.1.recv(),
+        )
+    };
+
     quote! {
         #[::vin::async_trait::async_trait]
         impl #impl_generics ::vin::vin_core::Actor for #name #ty_generics #where_clause {
@@ -95,6 +118,8 @@ pub fn form_actor_trait(
                     ::vin::tokio::pin!(shutdown);
                     ::vin::tokio::pin!(close);
 
+                    #(#semaphore_inits)*
+
                     ::vin::log::debug!("vin | actor '{}' started", id);
                     actor.vin_hidden.state.store(::vin::vin_core::State::Running);
                     <Self as ::vin::vin_core::Hooks>::on_started(actor.borrow()).await;
@@ -122,12 +147,14 @@ pub fn form_actor_trait(
                                     ::std::panic::resume_unwind(reason);
                                 },
                             },
-                            #(#msg_short_names = actor.vin_hidden.mailbox.#msg_short_names.1.recv() => {
+                            #(#semaphore_uses => {
+                                let permit = #semaphore_names.expect("vin | semaphore shouldn't be closed while the actor is running");
                                 let #msg_short_names = #msg_short_names.expect("vin | channel should never be closed while the actor is running");
                                 ::vin::log::debug!("vin | actor '{}' handling '{}'", id, stringify!(#msg_names));
 
                                 let actor = ::std::sync::Arc::clone(&actor);
                                 handler_join_set.spawn(async move {
+                                    let _permit = permit;
                                     if let Some(result_channel) = #msg_short_names.result_channel {
                                         let res = <Self as ::vin::vin_core::Handler<#msg_names>>::handle(actor.borrow(), #msg_short_names.msg).await;
                                         result_channel.send(res).unwrap(); // shouldn't ever fail
