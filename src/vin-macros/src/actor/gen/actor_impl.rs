@@ -67,12 +67,7 @@ pub fn form_actor_trait(
                                         let sem = ::std::sync::Arc::clone(&#sem_name);
                                         let actor = ::std::sync::Arc::clone(&actor);
                                         async move {
-                                            let sem_fut = sem.acquire_owned();
-                                            let recv_fut = actor.vin_hidden.mailbox.#short_name.1.recv();
-                                            ::vin::tokio::pin!(sem_fut);
-                                            ::vin::tokio::pin!(recv_fut);
-
-                                            ::vin::tokio::join!(sem_fut, recv_fut)
+                                            ::vin::futures::future::join(sem.acquire_owned(), actor.vin_hidden.mailbox.#short_name.1.recv()).await
                                         }
                                     };
                                 },
@@ -156,8 +151,7 @@ pub fn form_actor_trait(
                             let sem = ::std::sync::Arc::clone(&#sem_name);
                             let actor = ::std::sync::Arc::clone(&actor);
                             async move {
-                                use ::vin::tokio;
-                                ::vin::tokio::join!(sem.acquire_owned(), actor.vin_hidden.mailbox.#short_name.1.recv())
+                                ::vin::futures::future::join(sem.acquire_owned(), actor.vin_hidden.mailbox.#short_name.1.recv()).await
                             }
                         };
                     },
