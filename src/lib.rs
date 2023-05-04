@@ -133,4 +133,13 @@ pub use vin_macros::{actor, handles, task, message};
 #[doc(hidden)]
 pub mod prelude {
 	pub use crate::{Addr, Actor, StrongAddr, WeakAddr, StrongErasedAddr, WeakErasedAddr, TaskActor, TaskAddr};
+	
+	pub use crate::anyhow;
+	pub use crate::async_channel;
+	pub use crate::async_trait::{self, async_trait};
+	pub use crate::crossbeam;
+	pub use crate::downcast_rs;
+	pub use crate::futures;
+	pub use crate::tokio;
+	pub use crate::log;
 }
