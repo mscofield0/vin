@@ -129,3 +129,8 @@ pub use vin_macros::{actor, handles, task, message};
 #[doc(hidden)] pub use ::vin_core::futures;
 #[doc(hidden)] pub use ::vin_core::tokio;
 #[doc(hidden)] pub use ::vin_core::log;
+
+#[doc(hidden)]
+pub mod prelude {
+	pub use crate::{Addr, Actor, StrongAddr, WeakAddr, StrongErasedAddr, WeakErasedAddr, TaskActor, TaskAddr};
+}
