@@ -1,4 +1,4 @@
-use vin::{*, Actor};
+use vin::prelude::*;
 use std::time::{Instant, Duration};
 use tracing::Level;
 
@@ -17,9 +17,9 @@ struct SendPing;
 
 // Actor impl
 #[vin::actor]
-#[vin::handles(Ping, bounded(size = 128, wait))]
-#[vin::handles(Pong, bounded(size = 128, wait))]
-#[vin::handles(SendPing, bounded(size = 128, wait))]
+#[vin::handles(Ping, max = 128)]
+#[vin::handles(Pong, max = 128)]
+#[vin::handles(SendPing, max = 128)]
 struct PingActor {
     /// Actor id to communicate with
     other_id: vin::ActorId,
@@ -32,16 +32,16 @@ impl vin::Hooks for PingActor {}
 
 #[async_trait]
 impl vin::Handler<Ping> for PingActor {
-    async fn handle(&self, _: Ping) -> anyhow::Result<()> {
+    async fn handle(&self, _: Ping) -> Result<(), ()> {
         let ctx = self.ctx().await;
-        vin::send_at(&ctx.other_id, Pong).await;
+        vin::send::<PingActor, _, _>(ctx.other_id.clone(), Pong).await.expect("shouldn't have closed yet");
         Ok(())
     }
 }
 
 #[async_trait]
 impl vin::Handler<Pong> for PingActor {
-    async fn handle(&self, _: Pong) -> anyhow::Result<()> {
+    async fn handle(&self, _: Pong) -> Result<(), ()> {
         let now = Instant::now();
         let mut ctx = self.ctx_mut().await;
         match ctx.time_of_ping {
@@ -55,14 +55,14 @@ impl vin::Handler<Pong> for PingActor {
 
 #[async_trait]
 impl vin::Handler<SendPing> for PingActor {
-    async fn handle(&self, _: SendPing) -> anyhow::Result<()> {
+    async fn handle(&self, _: SendPing) -> Result<(), ()> {
         let mut ctx = self.ctx_mut().await;
         if let Some(_) = ctx.time_of_ping {
             log::info!("Cancelled previous ping.");
         }
         ctx.time_of_ping = Some(Instant::now());
 
-        vin::send_at(&ctx.other_id, Ping).await;
+        vin::send::<PingActor, _, _>(ctx.other_id.clone(), Ping).await.expect("shouldn't have closed yet");
         Ok(())
     }
 }

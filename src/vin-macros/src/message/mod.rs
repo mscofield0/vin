@@ -1,10 +1,10 @@
-mod result_attr;
+mod attr;
 
 use proc_macro::TokenStream;
 use proc_macro2::{TokenStream as TokenStream2};
 use syn::{parse_macro_input, Ident, DeriveInput, ImplGenerics, TypeGenerics, WhereClause};
 use quote::{quote};
-use result_attr::*;
+use attr::*;
 
 pub fn message_impl(args: TokenStream, input: TokenStream) -> TokenStream {
     let input = parse_macro_input!(input as DeriveInput);
@@ -13,13 +13,13 @@ pub fn message_impl(args: TokenStream, input: TokenStream) -> TokenStream {
     let name = &input.ident;
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
-	let result_arg = match syn::parse::<ResultArg>(args) {
-		Ok(result_arg) => result_arg,
+	let attr = match syn::parse::<Attr>(args) {
+		Ok(attr) => attr,
 		Err(err) => return err.to_compile_error().into(),
 	};
 
     // Message trait impl
-    let message_trait = form_message_trait_impl(result_arg, name, &impl_generics, &ty_generics, where_clause);
+    let message_trait = form_message_trait_impl(attr, name, &impl_generics, &ty_generics, where_clause);
 
     quote! {
         #input
@@ -29,20 +29,19 @@ pub fn message_impl(args: TokenStream, input: TokenStream) -> TokenStream {
 }
 
 fn form_message_trait_impl(
-	result_arg: ResultArg,
+	attr: Attr,
     name: &Ident,
     impl_generics: &ImplGenerics,
     ty_generics: &TypeGenerics,
 	where_clause: Option<&WhereClause>,
 ) -> TokenStream2 {
-	let result_type = match result_arg {
-		ResultArg::NoResult => quote! { () },
-		ResultArg::WithResult(result) => quote! { #result },
-	};
-	
+	let result = attr.result.map(|x| { quote! { #x } }).unwrap_or(quote! { () });
+	let error = attr.error.map(|x| { quote! { #x } }).unwrap_or(quote! { () });
+
 	quote! {
 		impl #impl_generics ::vin::vin_core::Message for #name #ty_generics #where_clause {
-			type Result = #result_type;
+			type Result = #result;
+			type Error = #error;
         }
 	}
 }

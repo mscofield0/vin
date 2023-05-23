@@ -41,14 +41,15 @@ impl Default for State {
 
 /// Trait indicating that the type is a message.
 pub trait Message: Downcast + Send {
-    type Result;
+    type Result: std::fmt::Debug + Send;
+    type Error: std::fmt::Debug + Send;
 }
-downcast_rs::impl_downcast!(Message assoc Result);
+downcast_rs::impl_downcast!(Message assoc Result, Error);
 
 /// Handler for specifying message handling logic.
 #[async_trait]
 pub trait Handler<M: Message> {
-    async fn handle(&self, msg: M) -> anyhow::Result<M::Result>;
+    async fn handle(&self, msg: M) -> Result<M::Result, M::Error>;
 }
 
 /// A restricted interface of `Actor` that provides send mechanics and state reads.
@@ -58,17 +59,13 @@ pub trait Addr: DowncastSync + Sync {
     /// Sends a typed message to the actor.
     async fn send<M: Message>(&self, msg: M)
         where
-            Self: Sized + Forwarder<M>,
-            M::Result: Send;
+            Self: Sized + Forwarder<M>;
 
     /// Sends a typed message to the actor and awaits the result.
-    async fn send_and_wait<M: Message>(&self, msg: M) -> anyhow::Result<M::Result>
+    #[must_use]
+    async fn send_and_wait<M: Message>(&self, msg: M) -> Result<M::Result, M::Error>
         where
-            Self: Sized + Forwarder<M>,
-            M::Result: Send;
-            
-    /// Sends an erased message to the actor.
-    async fn erased_send(&self, msg: BoxedMessage<()>);
+            Self: Sized + Forwarder<M>;
 
     /// Returns the current state of the actor.
     /// 
@@ -112,13 +109,16 @@ pub trait Actor: Addr {
     type Context;
 
     /// Returns a read lock to the underlying actor context.
+    #[must_use]
     async fn ctx(&self) -> RwLockReadGuard<Self::Context>;
 
     /// Returns a write lock to the underlying actor context.
+    #[must_use]
     async fn ctx_mut(&self) -> RwLockWriteGuard<Self::Context>;
 
     /// Creates and starts an actor with the given id (if available) and context.
-    async fn start<Id: Into<ActorId> + Send>(id: Id, ctx: Self::Context) -> anyhow::Result<StrongAddr<Self>>;
+    #[must_use]
+    async fn start<Id: Into<ActorId> + Send>(id: Id, ctx: Self::Context) -> Result<StrongAddr<Self>, ActorStartError>;
 }
 
 /// Actor id type for the actor registry.
@@ -135,9 +135,6 @@ pub type StrongErasedAddr = std::sync::Arc<dyn Addr>;
 
 /// A weak erased reference to the spawned actor.
 pub type WeakErasedAddr = std::sync::Weak<dyn Addr>;
-
-/// A boxed Message.
-pub type BoxedMessage<R> = Box<dyn Message<Result = R>>;
 
 /// Sends a shutdown signal to all actors.
 pub fn shutdown() {
@@ -202,8 +199,14 @@ pub enum ActorQueryError {
     InvalidType,
 }
 
+/// Error returned by `start()`.
+#[derive(thiserror::Error, Debug, Clone, PartialEq, Eq)]
+#[error("actor id already taken")]
+pub struct ActorStartError;
+
 /// Queries a typed actor from the registry.
-pub async fn query_actor<A: Addr, Id: AsRef<str>>(id: Id) -> Result<StrongAddr<A>, ActorQueryError> {
+pub async fn query_actor<A: Addr, Id: Into<ActorId>>(id: Id) -> Result<StrongAddr<A>, ActorQueryError> {
+    let id = id.into();
     let addr = query_actor_erased(id).await?;
     let addr = if let Ok(addr) = addr.downcast_arc::<A>() {
         addr
@@ -215,7 +218,8 @@ pub async fn query_actor<A: Addr, Id: AsRef<str>>(id: Id) -> Result<StrongAddr<A
 }
 
 /// Queries an erased actor from the registry.
-pub async fn query_actor_erased<Id: AsRef<str>>(id: Id) -> Result<StrongErasedAddr, ActorQueryError> {
+pub async fn query_actor_erased<Id: Into<ActorId>>(id: Id) -> Result<StrongErasedAddr, ActorQueryError> {
+    let id = id.into();
     let reg = REGISTRY.lock().await;
     let addr = reg.get(id.as_ref());
     let addr = match addr {
@@ -237,15 +241,30 @@ pub async fn query_actor_erased<Id: AsRef<str>>(id: Id) -> Result<StrongErasedAd
 }
 
 /// Sends a typed message to an actor with the corresponding id.
-pub async fn send_at<Id: AsRef<str>, M: Message<Result = ()>>(actor_id: Id, msg: M) {
-    let addr = query_actor_erased(actor_id).await.unwrap(); // TODO add logging
-    addr.erased_send(Box::new(msg)).await;
+pub async fn send<A, Id, M>(actor_id: Id, msg: M) -> Result<(), ActorQueryError>
+where
+    Id: Into<ActorId>,
+    M: Message,
+    A: Addr + Forwarder<M>
+{
+    let id = actor_id.into();
+    let addr = query_actor::<A, _>(id).await?;
+    addr.send(msg).await;
+
+    Ok(())
 }
 
-/// Sends an erased message to an actor with the corresponding id.
-pub async fn erased_send_at<Id: AsRef<str>>(actor_id: Id, msg: BoxedMessage<()>) {
-    let addr = query_actor_erased(actor_id).await.unwrap(); // TODO add logging
-    addr.erased_send(msg).await;
+/// Sends a typed message to an actor with the corresponding id.
+#[must_use]
+pub async fn send_and_wait<A, Id, M>(actor_id: Id, msg: M) -> Result<Result<M::Result, M::Error>, ActorQueryError>
+where
+    Id: Into<ActorId>,
+    M: Message,
+    A: Addr + Forwarder<M>
+{
+    let id = actor_id.into();
+    let addr = query_actor::<A, _>(id).await?;
+    Ok(addr.send_and_wait(msg).await)
 }
 
 /// Used to call arbitrary code on state changes.
@@ -273,7 +292,6 @@ pub async fn erased_send_at<Id: AsRef<str>>(actor_id: Id, msg: BoxedMessage<()>)
 pub trait Hooks {
     async fn on_started(&self) {}
     async fn on_closed(&self) {}
-    async fn on_error(&self, _err: anyhow::Error) {}
 }
 
 /// Actor trait that all generic (non-specialized) actors must implement.

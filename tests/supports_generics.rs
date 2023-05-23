@@ -1,8 +1,6 @@
 use vin::*;
 use std::fmt::Debug;
 
-struct Message;
-
 #[vin::message]
 #[derive(Debug, Clone)]
 pub enum Msg {
@@ -12,14 +10,14 @@ pub enum Msg {
 }
 
 #[vin::actor]
-#[vin::handles(Msg, bounded(size = 2, silent))]
+#[vin::handles(Msg, max = 5)]
 struct MyActor<T: Debug + Clone + Send + Sync + 'static> {
     value: T,
 }
 
 #[async_trait]
 impl<T: Debug + Clone + Send + Sync> vin::Handler<Msg> for MyActor<T> {
-    async fn handle(&self, msg: Msg) -> anyhow::Result<()> {
+    async fn handle(&self, msg: Msg) -> Result<(), ()> {
         log::info!("The message is: {:?}", msg);
         let ctx = self.ctx().await;
         log::info!("Value is: {:?}", ctx.value);

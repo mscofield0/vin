@@ -7,14 +7,14 @@ use vin::*;
 pub struct Msg;
 
 #[vin::actor]
-#[vin::handles(Msg, bounded(size = 5, wait))]
+#[vin::handles(Msg, max = 5)]
 struct MyActor;
 
 impl vin::Hooks for MyActor {}
 
 #[async_trait]
 impl vin::Handler<Msg> for MyActor {
-    async fn handle(&self, _: Msg) -> anyhow::Result<()> {
+    async fn handle(&self, _: Msg) -> Result<(), ()> {
         log::info!("Going into 500ms sleep...");
         tokio::time::sleep(Duration::from_millis(500)).await;
         log::info!("Awake");

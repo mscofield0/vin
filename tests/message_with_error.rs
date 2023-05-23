@@ -1,6 +1,6 @@
 use vin::*;
 
-#[vin::message]
+#[vin::message(error = String)]
 #[derive(Debug, Clone)]
 pub enum Msg {
     Foo,
@@ -8,21 +8,24 @@ pub enum Msg {
     Baz,
 }
 
-#[vin::actor(no_awaiting)]
-#[vin::handles(Msg, bounded(size = 2, silent))]
-struct MyActor;
-
-#[async_trait]
-impl vin::Handler<Msg> for MyActor {
-    async fn handle(&self, msg: Msg) -> anyhow::Result<()> {
-        println!("The message is: {:?}", msg);
-
-        Err(anyhow::anyhow!("hi, i am error"))
-    }
+#[vin::actor]
+#[vin::handles(Msg)]
+struct MyActor {
+    pub number: u32,
 }
 
 #[async_trait]
 impl vin::Hooks for MyActor {}
+
+#[async_trait]
+impl vin::Handler<Msg> for MyActor {
+    async fn handle(&self, msg: Msg) -> Result<(), String> {
+        let ctx = self.ctx().await;
+        println!("The message is: {:?} and the number is {}", msg, ctx.number);
+
+        Err("error".to_string())
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -36,7 +39,7 @@ mod tests {
             .with_max_level(Level::TRACE)
             .init();
 
-        let ctx = VinContextMyActor;
+        let ctx = VinContextMyActor { number: 42 };
         let actor = MyActor::start("test", ctx).await.unwrap();
         tokio::join!(
             actor.send(Msg::Bar),

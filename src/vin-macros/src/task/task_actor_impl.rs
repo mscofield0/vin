@@ -40,7 +40,7 @@ pub fn form_task_actor_trait(
                     ::vin::tokio::pin!(shutdown);
                     ::vin::tokio::pin!(close);
 
-                    ::vin::log::debug!("vin | task actor '{}' started", id);
+                    ::vin::log::debug!("vin.{} | task actor started", id);
                     actor.vin_hidden.state.store(::vin::vin_core::State::Running);
 
                     let mut task_join_set = ::vin::tokio::task::JoinSet::new();
@@ -54,22 +54,22 @@ pub fn form_task_actor_trait(
                     loop {
                         ::vin::tokio::select! {
                             _ = &mut close => {
-                                ::vin::log::debug!("vin | task actor '{}' received close signal", id);
+                                ::vin::log::debug!("vin.{} | task actor received close signal", id);
                                 break;
                             },
                             _ = &mut shutdown => {
-                                ::vin::log::debug!("vin | task actor '{}' received shutdown signal", id);
+                                ::vin::log::debug!("vin.{} | task actor received shutdown signal", id);
                                 actor.vin_hidden.close.notify_waiters();
                                 break;
                             },
                             Some(res) = task_join_set.join_next() => match res {
                                 Ok(task_res) => match task_res {
                                     Ok(_) => {
-                                        ::vin::log::debug!("vin | task actor '{}' completed gracefully", id);
+                                        ::vin::log::debug!("vin.{} | task actor completed gracefully", id);
                                         break;
                                     },
                                     Err(err) => {
-                                        ::vin::log::error!("vin | task actor '{}' failed with error: {:#?}", id, err);
+                                        ::vin::log::error!("vin.{} | task actor failed with error: {:#?}", id, err);
                                         break;
                                     }
                                 },
@@ -81,12 +81,12 @@ pub fn form_task_actor_trait(
                     }
 
                     actor.vin_hidden.state.store(::vin::vin_core::State::Closing);
-                    ::vin::log::debug!("vin | task actor '{}' is closing...", id);
+                    ::vin::log::debug!("vin.{} | task actor is closing...", id);
 
                     if let Some(res) = task_join_set.join_next().await {
                         match res {
                             Ok(task_res) => if let Err(err) = task_res {
-                                ::vin::log::error!("vin | task actor '{}' failed with error: {:#?}", id, err);
+                                ::vin::log::error!("vin.{} | task actor failed with error: {:#?}", id, err);
                             },
                             Err(join_err) => if let Ok(reason) = join_err.try_into_panic() {
                                 ::std::panic::resume_unwind(reason);
@@ -95,7 +95,7 @@ pub fn form_task_actor_trait(
                     }
 
                     actor.vin_hidden.state.store(::vin::vin_core::State::Closed);
-                    ::vin::log::debug!("vin | task actor '{}' is closed", id);
+                    ::vin::log::debug!("vin.{} | task actor is closed", id);
                     ::vin::vin_core::remove_actor();
                 });
 

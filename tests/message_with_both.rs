@@ -1,6 +1,6 @@
 use vin::*;
 
-#[vin::message]
+#[vin::message(result = u32, error = u32)]
 #[derive(Debug, Clone)]
 pub enum Msg {
     Foo,
@@ -9,7 +9,7 @@ pub enum Msg {
 }
 
 #[vin::actor]
-#[vin::handles(Msg, max = 1)]
+#[vin::handles(Msg)]
 struct MyActor {
     pub number: u32,
 }
@@ -19,11 +19,11 @@ impl vin::Hooks for MyActor {}
 
 #[async_trait]
 impl vin::Handler<Msg> for MyActor {
-    async fn handle(&self, msg: Msg) -> Result<(), ()> {
+    async fn handle(&self, msg: Msg) -> Result<u32, u32> {
         let ctx = self.ctx().await;
         println!("The message is: {:?} and the number is {}", msg, ctx.number);
 
-        Ok(())
+        Err(ctx.number)
     }
 }
 

@@ -3,17 +3,15 @@ use syn::{parse_macro_input, DeriveInput, Error, Data};
 use quote::quote;
 
 mod handles_attr;
-mod closing_attr;
 mod gen;
 mod names;
 
 use handles_attr::*;
 use gen::*;
 use names::*;
-use closing_attr::*;
 
 
-pub fn actor_impl(args: TokenStream, input: TokenStream) -> TokenStream {
+pub fn actor_impl(_args: TokenStream, input: TokenStream) -> TokenStream {
     let mut input = parse_macro_input!(input as DeriveInput);
 
     let data = match input.data {
@@ -25,16 +23,11 @@ pub fn actor_impl(args: TokenStream, input: TokenStream) -> TokenStream {
     let name = &input.ident;
     let generics = &input.generics;
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
- 
-	let closing_strategy = match syn::parse::<ClosingStrategy>(args) {
-		Ok(closing_strategy) => closing_strategy,
-		Err(err) => return err.to_compile_error().into(),
-	};
     
     // Parsed handles attributes
     let handles_attrs = input.attrs.iter()
         .filter(|attr| check_if_attr_from_vin(&attr, "handles"))
-        .map(|attr| attr.parse_args::<HandlesAttribute>())
+        .map(|attr| attr.parse_args::<HandlesAttr>())
         .collect::<Result<Vec<_>, _>>();
 
     let handles_attrs = match handles_attrs {
@@ -57,7 +50,7 @@ pub fn actor_impl(args: TokenStream, input: TokenStream) -> TokenStream {
     let forwarder_traits = form_forwarder_impls(name, &handles_attrs, &impl_generics, &ty_generics, where_clause);
 
     // Actor trait impl
-    let actor_trait = form_actor_trait(closing_strategy, name, &handles_attrs, &generics, &impl_generics, &ty_generics, where_clause);
+    let actor_trait = form_actor_trait(name, &handles_attrs, &impl_generics, &ty_generics, where_clause);
 
     // Modify struct fields
     let hidden_struct_name = form_hidden_struct_name(name);

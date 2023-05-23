@@ -29,21 +29,21 @@ impl vin::Hooks for MyActor {}
 
 #[async_trait]
 impl vin::Handler<MsgA> for MyActor {
-    async fn handle(&self, msg: MsgA) -> anyhow::Result<()> {
+    async fn handle(&self, msg: MsgA) -> Result<(), ()> {
         let ctx = self.ctx().await;
         println!("The message is: {:?} and the number is {}", msg, ctx.number);
 
-        Err(anyhow::anyhow!("hi, i am error"))
+        Err(())
     }
 }
 
 #[async_trait]
 impl vin::Handler<MsgB> for MyActor {
-    async fn handle(&self, msg: MsgB) -> anyhow::Result<()> {
+    async fn handle(&self, msg: MsgB) -> Result<(), ()> {
         let ctx = self.ctx().await;
         println!("The message is: {:?} and the number is {}", msg, ctx.number);
 
-        Err(anyhow::anyhow!("hi, i am error"))
+        Err(())
     }
 }
 
@@ -61,13 +61,16 @@ mod tests {
 
         let ctx = VinContextMyActor { number: 42 };
         let actor = MyActor::start("test", ctx).await.unwrap();
-        vin::send_at("test", MsgA::Bar).await;
-        vin::erased_send_at("test", Box::new(MsgA::Bar)).await;
+        vin::send::<MyActor, _, _>("test", MsgA::Bar).await.unwrap();
+        
+        vin::send_and_wait::<MyActor, _, _>("test", MsgA::Bar).await.unwrap().expect_err("expected error");
         actor.send(MsgA::Bar).await;
         actor.send(MsgB::Bar).await;
-        actor.erased_send(Box::new(MsgA::Bar)).await;
         tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // sometimes, an actor will close before the message is sent
         actor.send_and_wait(MsgA::Bar).await.expect_err("expected error");
+
         vin::shutdown();
         vin::wait_for_shutdowns().await;
     }

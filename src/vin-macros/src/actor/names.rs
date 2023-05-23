@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use syn::{Ident, TypePath, Attribute, PathSegment};
-use super::handles_attr::*;
+use super::handles_attr::HandlesAttr;
 
 pub fn form_mailbox_name(name: &Ident) -> Ident {
     quote::format_ident!("VinMailbox{}", name)
@@ -14,14 +14,14 @@ pub fn form_context_struct_name(name: &Ident) -> Ident {
     quote::format_ident!("VinContext{}", name)
 }
 
-pub fn form_message_names(handles_attrs: &Vec<HandlesAttribute>) -> (Vec<TypePath>, Vec<Ident>) {
+pub fn form_message_names(handles_attrs: &Vec<HandlesAttr>) -> (Vec<TypePath>, Vec<Ident>) {
     let msg_names = handles_attrs.iter()
-        .map(|attr| attr.message_type.clone())
+        .map(|attr| attr.msg_type.clone())
         .collect::<Vec<_>>();
 
     let msg_short_names = handles_attrs.iter()
         .map(|attr| {
-            let ident_name = attr.message_type.path.segments.last().unwrap().ident.to_string().to_lowercase();
+            let ident_name = attr.msg_type.path.segments.last().unwrap().ident.to_string().to_lowercase();
             quote::format_ident!("{}", ident_name)
         })
         .collect::<Vec<_>>();

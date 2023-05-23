@@ -9,7 +9,7 @@ pub enum Msg {
 }
 
 #[vin::actor]
-#[vin::handles(Msg, bounded(size = 1, report))]
+#[vin::handles(Msg)]
 struct MyActor {
     pub number: u32,
 }
@@ -19,15 +19,11 @@ impl vin::Hooks for MyActor {}
 
 #[async_trait]
 impl vin::Handler<Msg> for MyActor {
-    async fn handle(&self, msg: Msg) -> anyhow::Result<<Msg as Message>::Result> {
+    async fn handle(&self, msg: Msg) -> Result<u32, ()> {
         let ctx = self.ctx().await;
-        let res = match msg {
-            Msg::Foo => ctx.number + 42,
-            Msg::Bar => ctx.number * 2,
-            Msg::Baz => ctx.number + 100,
-        };
+        println!("The message is: {:?} and the number is {}", msg, ctx.number);
 
-        Ok(res)
+        Ok(ctx.number)
     }
 }
 
@@ -35,7 +31,6 @@ impl vin::Handler<Msg> for MyActor {
 mod tests {
     use std::time::Duration;
     use tracing::Level;
-    use vin::futures::FutureExt;
     use super::*;
 
     #[tokio::test]
@@ -47,9 +42,9 @@ mod tests {
         let ctx = VinContextMyActor { number: 42 };
         let actor = MyActor::start("test", ctx).await.unwrap();
         tokio::join!(
-            actor.send_and_wait(Msg::Foo).map(|x| x.map(|x| log::info!("{}", x))),
             actor.send(Msg::Bar),
             actor.send(Msg::Baz),
+            actor.send(Msg::Foo),
             actor.send(Msg::Bar),
         );
         tokio::time::sleep(Duration::from_millis(100)).await;
