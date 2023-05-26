@@ -11,33 +11,23 @@ use quote::quote;
 
 /// Generates the actor impls and forms necessary fields.
 /// 
-/// # Arguments
-/// This proc macro supports the following arguments:
-/// - `awaiting` (default)
-/// - `no_awaiting`
-/// 
 /// # `vin::handles()` proc macro
 /// Specifies which message the actor handles, then generates code to handle the message.
 /// 
 /// ## Arguments
-/// Currently there is only one additional argument and it's 'bounded'.
-/// 
-/// ### `bounded`
-/// The `bounded` argument allows you to set an upper limit to the amount of messages a mailbox 
-/// can take in. It also allows you to set a strategy for handling a full mailbox. Current 
-/// available strategies are: 'wait' (awaits until the mailbox is available), 'report' (reports a failure) 
-/// and 'silent' (silently discards the message).
+/// - message type
+/// - maximum messages to handle concurrently (optional)
 /// 
 /// # Example
 /// ```ignore
-/// #[vin::actor] /* defaults to `awaiting` */
-/// #[vin::handles(MyMsg, bounded(size = 1024, report))]
+/// #[vin::actor]
+/// #[vin::handles(MyMsg)]
 /// struct MyActor;
 /// 
 /// /* or */
 /// 
-/// #[vin::actor(no_awaiting)]
-/// #[vin::handles(MyMsg, bounded(size = 1024, wait))]
+/// #[vin::actor]
+/// #[vin::handles(MyMsg, max = 1024)]
 /// struct MyActor;
 /// ```
 #[proc_macro_attribute]
@@ -104,6 +94,11 @@ pub fn task(args: TokenStream, input: TokenStream) -> TokenStream {
 /// or
 /// ```ignore
 /// #[vin::message(result = u32)]
+/// struct MyMsg;
+/// ```
+/// or
+/// ```ignore
+/// #[vin::message(result = u32, error = MyError)]
 /// struct MyMsg;
 /// ```
 #[proc_macro_attribute]
