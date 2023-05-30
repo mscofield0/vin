@@ -18,7 +18,7 @@ pub static ACTORS_ALIVE: AtomicUsize = AtomicUsize::new(0);
 
 lazy_static! {
     /// An actor registry that is queriable via `query_actor()` and `query_actor_erased()`.
-    pub static ref REGISTRY: tokio::sync::Mutex<HashMap<ActorId, WeakErasedAddr>> = Default::default();
+    pub static ref REGISTRY: std::sync::Mutex<HashMap<ActorId, WeakErasedAddr>> = Default::default();
 }
 
 /// A message wrapper type that enables returning results through the result channel packed inside it.

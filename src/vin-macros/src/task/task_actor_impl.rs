@@ -20,7 +20,7 @@ pub fn form_task_actor_trait(
     quote! {
         #[::vin::async_trait::async_trait]
         impl #impl_generics ::vin::vin_core::TaskActor for #name #ty_generics #where_clause {
-            async fn start<Id: Into<::vin::vin_core::ActorId> + Send>(id: Id, mut ctx: Self::Context) -> ::vin::vin_core::StrongAddr<Self> {
+            fn start<Id: Into<::vin::vin_core::ActorId> + Send>(id: Id, mut ctx: Self::Context) -> ::vin::vin_core::StrongAddr<Self> {
                 ::vin::vin_core::add_actor();
                 let id = id.into();
                 let ret = ::std::sync::Arc::new(Self {

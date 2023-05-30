@@ -40,7 +40,7 @@ mod tests {
             .init();
 
         let ctx = VinContextMyActor { number: 42 };
-        let actor = MyActor::start("test", ctx).await.unwrap();
+        let actor = MyActor::start("test", ctx).unwrap();
         tokio::join!(
             actor.send(Msg::Bar),
             actor.send(Msg::Baz),

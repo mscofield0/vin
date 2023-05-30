@@ -35,7 +35,7 @@ mod tests {
             number: 5,
             _phantom: std::marker::PhantomData,
         };
-        let actor = MyTaskActor::start("test_task", ctx).await;
+        let actor = MyTaskActor::start("test_task", ctx);
         drop(actor);
         tokio::time::sleep(Duration::from_millis(100)).await;
         // actor.close();

@@ -60,7 +60,7 @@ mod tests {
             .init();
 
         let ctx = VinContextMyActor { number: 42 };
-        let actor = MyActor::start("test", ctx).await.unwrap();
+        let actor = MyActor::start("test", ctx).unwrap();
         vin::send::<MyActor, _, _>("test", MsgA::Bar).await.unwrap();
         
         vin::send_and_wait::<MyActor, _, _>("test", MsgA::Bar).await.unwrap().expect_err("expected error");

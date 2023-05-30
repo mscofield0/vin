@@ -118,7 +118,7 @@ pub trait Actor: Addr {
 
     /// Creates and starts an actor with the given id (if available) and context.
     #[must_use]
-    async fn start<Id: Into<ActorId> + Send>(id: Id, ctx: Self::Context) -> Result<StrongAddr<Self>, ActorStartError>;
+    fn start<Id: Into<ActorId> + Send>(id: Id, ctx: Self::Context) -> Result<StrongAddr<Self>, ActorStartError>;
 }
 
 /// Actor id type for the actor registry.
@@ -220,7 +220,7 @@ pub async fn query_actor<A: Addr, Id: Into<ActorId>>(id: Id) -> Result<StrongAdd
 /// Queries an erased actor from the registry.
 pub async fn query_actor_erased<Id: Into<ActorId>>(id: Id) -> Result<StrongErasedAddr, ActorQueryError> {
     let id = id.into();
-    let reg = REGISTRY.lock().await;
+    let reg = REGISTRY.lock().expect("actor registry should never be poisoned");
     let addr = reg.get(id.as_ref());
     let addr = match addr {
         Some(addr) => if let Some(addr) = addr.upgrade() {
@@ -298,7 +298,7 @@ pub trait Hooks {
 #[async_trait]
 pub trait TaskActor: Task + TaskAddr {
     /// Creates and starts a task actor with the given id (if available) and context.
-    async fn start<Id: Into<ActorId> + Send>(id: Id, ctx: Self::Context) -> StrongAddr<Self>;
+    fn start<Id: Into<ActorId> + Send>(id: Id, ctx: Self::Context) -> StrongAddr<Self>;
 }
 
 /// A restricted interface of `TaskActor` that provides closing and state reads.

@@ -35,7 +35,7 @@ mod tests {
             .init();
 
         let ctx = VinContextMyActor;
-        let actor = MyActor::start("test", ctx).await.unwrap();
+        let actor = MyActor::start("test", ctx).unwrap();
         actor.send(Msg).await;
         actor.send(Msg).await;
         actor.send(Msg).await;

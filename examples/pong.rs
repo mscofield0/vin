@@ -73,8 +73,8 @@ async fn main() {
         .with_max_level(Level::TRACE)
         .init();
 
-    let a1 = PingActor::start("test1", VinContextPingActor { other_id: "test2".into(), time_of_ping: Default::default() }).await.unwrap();
-    let a2 = PingActor::start("test2", VinContextPingActor { other_id: "test1".into(), time_of_ping: Default::default() }).await.unwrap();
+    let a1 = PingActor::start("test1", VinContextPingActor { other_id: "test2".into(), time_of_ping: Default::default() }).unwrap();
+    let a2 = PingActor::start("test2", VinContextPingActor { other_id: "test1".into(), time_of_ping: Default::default() }).unwrap();
 
     a1.send(SendPing).await;
     a2.send(SendPing).await;

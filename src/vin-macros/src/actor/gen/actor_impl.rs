@@ -70,12 +70,12 @@ pub fn form_actor_trait(
                 self.vin_ctx.write().await
             }
 
-            async fn start<Id: Into<::vin::vin_core::ActorId> + Send>(id: Id, ctx: Self::Context) -> ::std::result::Result<::vin::vin_core::StrongAddr<Self>, ::vin::vin_core::ActorStartError> {
+            fn start<Id: Into<::vin::vin_core::ActorId> + Send>(id: Id, ctx: Self::Context) -> ::std::result::Result<::vin::vin_core::StrongAddr<Self>, ::vin::vin_core::ActorStartError> {
                 let id = id.into();
 
                 // Add actor to global registry
                 let ret = {
-                    let mut reg = ::vin::vin_core::detail::REGISTRY.lock().await;
+                    let mut reg = ::vin::vin_core::detail::REGISTRY.lock().expect("actor registry should never be poisoned");
                     if reg.contains_key(&id) {
                         return Err(::vin::vin_core::ActorStartError);
                     }
@@ -116,7 +116,6 @@ pub fn form_actor_trait(
                             },
                             _ = &mut shutdown => {
                                 ::vin::log::debug!("vin.{} | actor received shutdown signal", id);
-                                actor.vin_hidden.close.notify_waiters();
                                 break;
                             },
                             Some(res) = handler_join_set.join_next() => if let Err(join_err) = res {
@@ -127,6 +126,8 @@ pub fn form_actor_trait(
                             #(#msg_recv_impls),*
                         };
                     }
+
+                    actor.vin_hidden.close.notify_waiters();
 
                     // Give some time for the existing handlers to gracefully end
                     actor.vin_hidden.state.store(::vin::vin_core::State::Closing);
@@ -153,7 +154,7 @@ pub fn form_actor_trait(
 
                     // Remove the actor from the registry
                     {
-                        let mut reg = ::vin::vin_core::detail::REGISTRY.lock().await;
+                        let mut reg = ::vin::vin_core::detail::REGISTRY.lock().expect("actor registry should never be poisoned");
                         reg.remove(&id);
                     }
                     ::vin::vin_core::remove_actor();

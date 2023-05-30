@@ -12,7 +12,7 @@ A lightweight, ergonomic and unconventional actor crate.
 
 ```toml
 [dependencies]
-vin = "7.0"
+vin = "8.0"
 ```
 
 ## Overview
@@ -77,7 +77,7 @@ async fn main() {
         .init();
 
     let ctx = VinContextMyActor { number: 42 };
-    let actor = MyActor::start("test", ctx).await.unwrap();
+    let actor = MyActor::start("test", ctx).unwrap();
     actor.send(Msg::Bar).await;
     tokio::time::sleep(Duration::from_millis(500)).await;
     let res = actor.send_and_wait(MsgWithResult(false)).await.unwrap();
@@ -119,7 +119,7 @@ async fn main() {
         .init();
 
     let ctx = VinContextMyTaskActor { number: 5 };
-    let actor = MyTaskActor::start("test_task", ctx).await;
+    let actor = MyTaskActor::start("test_task", ctx);
     tokio::time::sleep(Duration::from_millis(100)).await;
     actor.close();
     vin::shutdown();
