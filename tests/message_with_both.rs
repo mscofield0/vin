@@ -1,6 +1,13 @@
 use vin::*;
 
-#[vin::message(result = u32, error = u32)]
+pub mod epic {
+    pub mod win {
+        #[derive(Debug, Clone)]
+        pub struct EpicWin;
+    }
+}
+
+#[vin::message(result = (u32, epic::win::EpicWin), error = u32)]
 #[derive(Debug, Clone)]
 pub enum Msg {
     Foo,
@@ -19,11 +26,11 @@ impl vin::Hooks for MyActor {}
 
 #[async_trait]
 impl vin::Handler<Msg> for MyActor {
-    async fn handle(&self, msg: Msg) -> Result<u32, u32> {
+    async fn handle(&self, msg: Msg) -> Result<(u32, epic::win::EpicWin), u32> {
         let ctx = self.ctx().await;
         println!("The message is: {:?} and the number is {}", msg, ctx.number);
 
-        Err(ctx.number)
+        Ok((ctx.number, epic::win::EpicWin))
     }
 }
 

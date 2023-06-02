@@ -1,8 +1,8 @@
-use syn::{Ident, parse::Parse, Error, TypePath, Token, token};
+use syn::{Ident, parse::Parse, Error, Token, Type, token};
 
 pub struct Attr {
-	pub result: Option<TypePath>,
-	pub error: Option<TypePath>,
+	pub result: Option<Type>,
+	pub error: Option<Type>,
 }
 
 impl Parse for Attr {
@@ -15,7 +15,7 @@ impl Parse for Attr {
 		let mut read_arg = || {
 			let ident = input.parse::<Ident>()?;
 			input.parse::<Token![=]>()?;
-			let value = input.parse::<TypePath>()?;
+			let value = input.parse::<Type>()?;
 			match ident.to_string().as_str() {
 				"result" => if result.is_none() {
 					result = Some(value);
