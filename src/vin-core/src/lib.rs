@@ -81,7 +81,7 @@ pub trait Addr: DowncastSync + Sync {
     fn close_future(&self) -> Notified<'_>;
 
     /// Returns the id of the actor.
-    fn id(&self) -> String;
+    fn id(&self) -> ActorId;
 
     /// Checks if the actor has been started.
     fn is_started(&self) -> bool {
@@ -313,7 +313,7 @@ pub trait TaskAddr {
     fn state(&self) -> State;
 
     /// Returns the id of the task actor.
-    fn id(&self) -> String;
+    fn id(&self) -> ActorId;
 
     /// Returns if the task actor is closed.
     fn is_closed(&self) -> bool {

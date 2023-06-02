@@ -116,8 +116,8 @@ pub fn form_task_actor_trait(
                 self.vin_hidden.state.load()
             }
 
-            fn id(&self) -> String {
-                self.vin_hidden.id.to_string()
+            fn id(&self) -> ::vin::vin_core::ActorId {
+                self.vin_hidden.id.clone()
             }
         }
 
