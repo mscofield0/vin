@@ -12,7 +12,7 @@ A lightweight, ergonomic and unconventional actor crate.
 
 ```toml
 [dependencies]
-vin = "9.0"
+vin = "9.1"
 ```
 
 ## Overview

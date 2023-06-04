@@ -52,6 +52,26 @@ pub trait Handler<M: Message> {
     async fn handle(&self, msg: M) -> Result<M::Result, M::Error>;
 }
 
+/// Forwards the message to the respective mailbox.
+#[async_trait]
+pub trait Forwarder<M: Message> {
+    async fn forward(&self, msg: WrappedMessage<M>);
+}
+
+/// A message wrapper type that enables returning results through the result channel packed inside it.
+/// 
+/// # Note
+/// Should not be used directly. The only reason it is exposed is because exposing [`Forwarder`] requires it.
+/// 
+/// [`Forwarder`]: trait.Forwarder.html
+pub struct WrappedMessage<M: Message> {
+    /// The actual message to be sent.
+    pub msg: M,
+
+    /// The result channel used to send the result, if used with `send_and_wait()`.
+    pub result_channel: Option<tokio::sync::oneshot::Sender<Result<M::Result, M::Error>>>,
+}
+
 /// A restricted interface of `Actor` that provides send mechanics and state reads.
 #[async_trait]
 pub trait Addr: DowncastSync + Sync {

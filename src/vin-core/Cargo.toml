@@ -1,6 +1,6 @@
 [package]
 name = "vin-core"
-version = "8.0.0"
+version = "8.1.0"
 edition = "2021"
 categories = ["concurrency"]
 description = "Core types and traits for vin"
