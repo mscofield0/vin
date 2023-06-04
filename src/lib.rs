@@ -114,7 +114,7 @@
 //! ```
 
 pub use vin_core::{
-	self, State, Message, Addr, Actor, ActorId, Handler,
+	self, State, Message, Addr, Actor, ActorId, Handler, Forwarder,
 	StrongAddr, WeakAddr, StrongErasedAddr, WeakErasedAddr,
 	shutdown, shutdown_future, add_actor, remove_actor,
 	wait_for_shutdowns, ActorQueryError, ActorStartError, query_actor, query_actor_erased,
@@ -133,7 +133,7 @@ pub use vin_macros::{actor, handles, task, message};
 
 #[doc(hidden)]
 pub mod prelude {
-	pub use crate::{Addr, Actor, StrongAddr, WeakAddr, StrongErasedAddr, WeakErasedAddr, TaskActor, TaskAddr};
+	pub use crate::{Addr, Actor, Forwarder, StrongAddr, WeakAddr, StrongErasedAddr, WeakErasedAddr, TaskActor, TaskAddr};
 	
 	pub use crate::anyhow;
 	pub use crate::async_channel;
