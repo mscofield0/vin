@@ -120,7 +120,7 @@ pub fn form_actor_trait(
                             },
                             Some(res) = handler_join_set.join_next() => if let Err(join_err) = res {
                                 if let Ok(reason) = join_err.try_into_panic() {
-                                    ::std::panic::resume_unwind(reason);
+                                    ::vin::log::error!("vin.{} | actor received panic from handler: {:?}", id, reason);
                                 }
                             },
                             #(#msg_recv_impls),*
@@ -137,7 +137,7 @@ pub fn form_actor_trait(
                     while let Some(res) = handler_join_set.join_next().await {
                         if let Err(join_err) = res {
                             if let Ok(reason) = join_err.try_into_panic() {
-                                ::std::panic::resume_unwind(reason);
+                                ::vin::log::error!("vin.{} | actor received panic from handler: {:?}", id, reason);
                             }
                         }
                     }

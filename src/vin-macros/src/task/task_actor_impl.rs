@@ -74,7 +74,7 @@ pub fn form_task_actor_trait(
                                     }
                                 },
                                 Err(join_err) => if let Ok(reason) = join_err.try_into_panic() {
-                                    ::std::panic::resume_unwind(reason);
+                                    ::vin::log::error!("vin.{} | task actor received panic from handler: {:?}", id, reason);
                                 },
                             },
                         };
@@ -89,7 +89,7 @@ pub fn form_task_actor_trait(
                                 ::vin::log::error!("vin.{} | task actor failed with error: {:#?}", id, err);
                             },
                             Err(join_err) => if let Ok(reason) = join_err.try_into_panic() {
-                                ::std::panic::resume_unwind(reason);
+                                ::vin::log::error!("vin.{} | task actor received panic from handler: {:?}", id, reason);
                             },
                         }
                     }
