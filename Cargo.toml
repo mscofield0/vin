@@ -1,6 +1,6 @@
 [package]
 name = "vin"
-version = "9.1.2"
+version = "9.1.3"
 edition = "2021"
 categories = ["concurrency"]
 description = "An ergonomic actor framework"
@@ -14,7 +14,7 @@ repository = "https://github.com/mscofield0/vin"
 
 [dependencies]
 vin-core = { path = "src/vin-core", version = "8.1.0" }
-vin-macros = { path = "src/vin-macros", version = "8.0.1" }
+vin-macros = { path = "src/vin-macros", version = "8.0.2" }
 
 [dev-dependencies]
 tracing = "0.1"

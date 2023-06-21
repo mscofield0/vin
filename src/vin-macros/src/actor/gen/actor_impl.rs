@@ -36,7 +36,7 @@ pub fn form_actor_trait(
                 (permit, msg) = #wrap_name() => {
                     let permit = permit.expect("vin | semaphore shouldn't be closed while the actor is running");
                     let msg = msg.expect("vin | channel should never be closed while the actor is running");
-                    ::vin::log::debug!("vin.{} | actor handling '{}'", id, stringify!(#full));
+                    ::vin::log::trace!("vin.{} | actor handling '{}'", id, stringify!(#full));
 
                     let id = id.clone();
                     let actor = ::std::sync::Arc::clone(&actor);
@@ -44,8 +44,8 @@ pub fn form_actor_trait(
                         let _permit = permit;
                         let res = <Self as ::vin::vin_core::Handler<#full>>::handle(actor.borrow(), msg.msg).await;
                         match &res {
-                            Ok(res) => ::vin::log::debug!("vin.{} | actor handling of '{}' completed with: {:?}", id, stringify!(#full), res),
-                            Err(err) => ::vin::log::error!("vin.{} | actor handling of '{}' failed with error: {:#?}", id, stringify!(#full), err),
+                            Ok(res) => ::vin::log::trace!("vin.{} | actor handling of '{}' completed with: {:?}", id, stringify!(#full), res),
+                            Err(err) => ::vin::log::trace!("vin.{} | actor handling of '{}' failed with error: {:#?}", id, stringify!(#full), err),
                         }
 
                         if let Some(result_channel) = msg.result_channel {
@@ -105,17 +105,17 @@ pub fn form_actor_trait(
 
                     #(#sem_inits)*
 
-                    ::vin::log::debug!("vin.{} | actor started", id);
+                    ::vin::log::trace!("vin.{} | actor started", id);
                     actor.vin_hidden.state.store(::vin::vin_core::State::Running);
                     <Self as ::vin::vin_core::Hooks>::on_started(actor.borrow()).await;
                     loop {
                         ::vin::tokio::select! {
                             _ = &mut close => {
-                                ::vin::log::debug!("vin.{} | actor received close signal", id);
+                                ::vin::log::trace!("vin.{} | actor received close signal", id);
                                 break;
                             },
                             _ = &mut shutdown => {
-                                ::vin::log::debug!("vin.{} | actor received shutdown signal", id);
+                                ::vin::log::trace!("vin.{} | actor received shutdown signal", id);
                                 break;
                             },
                             Some(res) = handler_join_set.join_next() => if let Err(join_err) = res {
@@ -131,7 +131,7 @@ pub fn form_actor_trait(
 
                     // Give some time for the existing handlers to gracefully end
                     actor.vin_hidden.state.store(::vin::vin_core::State::Closing);
-                    ::vin::log::debug!("vin.{} | actor is closing...", id);
+                    ::vin::log::trace!("vin.{} | actor is closing...", id);
 
                     // Either await until completion or just wait for 30 more seconds and then close
                     while let Some(res) = handler_join_set.join_next().await {
@@ -150,7 +150,7 @@ pub fn form_actor_trait(
                     // Run the lifecycle on_closed hook
                     <Self as ::vin::vin_core::Hooks>::on_closed(actor.borrow()).await;
                     actor.vin_hidden.state.store(::vin::vin_core::State::Closed);
-                    ::vin::log::debug!("vin.{} | actor is closed", id);
+                    ::vin::log::trace!("vin.{} | actor is closed", id);
 
                     // Remove the actor from the registry
                     {
